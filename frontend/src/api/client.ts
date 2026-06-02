@@ -1,6 +1,12 @@
 import type { DailyMeasurement, DashboardSummary, SeriesOut, User, UserUpdate } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? "";
+function getApiBase(): string {
+  const runtime = window.__API_URL__?.trim().replace(/\/$/, "");
+  if (runtime) return runtime;
+  return import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "") ?? "";
+}
+
+const API_BASE = getApiBase();
 
 class ApiError extends Error {
   status: number;
@@ -14,6 +20,13 @@ async function request<T>(
   path: string,
   options: RequestInit & { token?: string | null } = {},
 ): Promise<T> {
+  if (!API_BASE) {
+    throw new ApiError(
+      0,
+      "API non configurée : définir VITE_API_URL sur le service web Railway (URL de l’API, sans slash final).",
+    );
+  }
+
   const { token, ...init } = options;
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -35,6 +48,14 @@ async function request<T>(
       /* ignore */
     }
     throw new ApiError(res.status, String(detail));
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new ApiError(
+      res.status,
+      "Réponse invalide du serveur — vérifiez VITE_API_URL (doit pointer vers l’API, pas le frontend).",
+    );
   }
   return res.json() as Promise<T>;
 }

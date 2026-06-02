@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.railpack.com",
   "deploy": {
-    "paths": ["/app/.venv/bin"],
     "startCommand": "/bin/sh scripts/railway-start.sh"
   }
 }

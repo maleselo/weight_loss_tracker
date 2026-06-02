@@ -44,7 +44,7 @@ Repo : `https://github.com/maleselo/weight_loss_tracker`
 | **Custom Build Command** | **vide** |
 | **Custom Start Command** | **vide** (défini dans `railway.toml` + `railpack.json`) |
 
-Railpack installe les deps dans `/app/.venv`. `scripts/railway-start.sh` active ce venv (`. /app/.venv/bin/activate`) puis lance `alembic upgrade head` et `uvicorn`.
+Railpack installe les deps dans `/app/.venv/lib/.../site-packages`. Le script `scripts/railway-start.sh` ajoute ce dossier au `PYTHONPATH` (le binaire `/app/.venv/bin/python` est souvent un lien cassé vers mise), puis lance `alembic` et `uvicorn` via le Python mise.
 
 ### 3.3 Variables (onglet **Variables**)
 

@@ -40,15 +40,11 @@ Repo : `https://github.com/maleselo/weight_loss_tracker`
 | **Service name** | `api` |
 | **Root Directory** | `backend` |
 | **Railway config file** | `/backend/railway.toml` (chemin absolu depuis la racine du repo) |
-| **Builder** | Railpack (auto) — **ne pas** forcer Dockerfile sauf si tu l’as choisi explicitement |
-| **Custom Build Command** | **vide** — Railpack installe déjà `requirements.txt` ; ne pas y mettre `alembic` |
+| **Builder** | Railpack (auto) — **pas** Dockerfile |
+| **Custom Build Command** | **vide** |
+| **Custom Start Command** | **vide** (défini dans `railway.toml` + `railpack.json`) |
 
-> **Erreur fréquente :** une commande du type `pip install -r requirements.txt && alembic upgrade head` échoue avec `alembic: not found` (alembic est dans le venv, pas dans le PATH du build). Les migrations doivent passer par **Pre-deploy**, pas le build.
-
-Railpack détecte Python 3.11 (`.python-version`) et installe `requirements.txt` automatiquement.
-
-Commandes deploy (`backend/railway.toml`) — migrations au **démarrage** (le pre-deploy Railway n’a pas le venv Railpack) :
-- Start : `scripts/railway-start.sh` → `alembic upgrade head` puis `uvicorn`
+Railpack installe les deps dans `/app/.venv`. `scripts/railway-start.sh` active ce venv (`. /app/.venv/bin/activate`) puis lance `alembic upgrade head` et `uvicorn`.
 
 ### 3.3 Variables (onglet **Variables**)
 

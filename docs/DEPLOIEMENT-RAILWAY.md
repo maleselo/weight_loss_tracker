@@ -41,8 +41,10 @@ Repo : `https://github.com/maleselo/weight_loss_tracker`
 | **Root Directory** | `backend` |
 | **Config file** | détecte `backend/railway.toml` |
 
-Les commandes build/start sont dans `backend/railway.toml` :
-- Build : `pip install -e . && alembic upgrade head`
+Railpack installe Python et les dépendances depuis `backend/requirements.txt` (ne pas surcharger `buildCommand` : cela empêche l’installation de Python et provoque `pip: not found`).
+
+Les commandes deploy sont dans `backend/railway.toml` :
+- Pre-deploy : `alembic upgrade head` (migrations, après le build)
 - Start : `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 ### 3.3 Variables (onglet **Variables**)

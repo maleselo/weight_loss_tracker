@@ -4,7 +4,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.core.config import settings
+from app.core.config import normalize_postgres_url, settings
 from app.db.base import Base
 from app.models.daily_measurement import DailyMeasurement  # noqa: F401
 from app.models.user import User  # noqa: F401
@@ -17,7 +17,8 @@ target_metadata = Base.metadata
 
 def get_url() -> str:
     # Alembic lit sqlalchemy.url depuis la config; on le surcharge avec DATABASE_URL.
-    return os.getenv("DATABASE_URL", settings.database_url)
+    raw = os.getenv("DATABASE_URL", settings.database_url)
+    return normalize_postgres_url(raw)
 
 
 def run_migrations_offline() -> None:

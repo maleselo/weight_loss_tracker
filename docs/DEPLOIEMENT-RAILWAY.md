@@ -48,7 +48,7 @@ Repo : `https://github.com/maleselo/weight_loss_tracker`
 Railpack détecte Python 3.11 (`.python-version`) et installe `requirements.txt` automatiquement.
 
 Commandes deploy (`backend/railway.toml`) :
-- Pre-deploy : `python -m alembic upgrade head`
+- Pre-deploy : `/app/.venv/bin/python -m alembic upgrade head` (venv Railpack, pas le Python système)
 - Start : `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 ### 3.3 Variables (onglet **Variables**)

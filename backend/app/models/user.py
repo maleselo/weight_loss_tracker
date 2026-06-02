@@ -1,0 +1,17 @@
+from sqlalchemy import Integer, Numeric, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    taille_cm: Mapped[float | None] = mapped_column(Numeric(5, 1), nullable=True)
+    poids_cible_kg: Mapped[float | None] = mapped_column(Numeric(5, 1), nullable=True)
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Europe/Paris")
+
+    measurements = relationship("DailyMeasurement", back_populates="user")

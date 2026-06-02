@@ -40,14 +40,15 @@ Repo : `https://github.com/maleselo/weight_loss_tracker`
 | **Service name** | `api` |
 | **Root Directory** | `backend` |
 | **Railway config file** | `/backend/railway.toml` (chemin absolu depuis la racine du repo) |
-| **Custom Build Command** | **vide** (ne pas laisser `pip install -e . && alembic upgrade head`) |
+| **Builder** | Railpack (auto) — **ne pas** forcer Dockerfile sauf si tu l’as choisi explicitement |
+| **Custom Build Command** | **vide** — Railpack installe déjà `requirements.txt` ; ne pas y mettre `alembic` |
 
-> **Important :** le fichier `railway.toml` n’est **pas** détecté automatiquement quand le root directory est un sous-dossier. Sans le chemin `/backend/railway.toml`, Railway réutilise l’ancienne commande du dashboard → erreur `pip: not found`.
+> **Erreur fréquente :** une commande du type `pip install -r requirements.txt && alembic upgrade head` échoue avec `alembic: not found` (alembic est dans le venv, pas dans le PATH du build). Les migrations doivent passer par **Pre-deploy**, pas le build.
 
-Le build utilise `backend/Dockerfile` (Python 3.11 + `requirements.txt`).
+Railpack détecte Python 3.11 (`.python-version`) et installe `requirements.txt` automatiquement.
 
 Commandes deploy (`backend/railway.toml`) :
-- Pre-deploy : `alembic upgrade head`
+- Pre-deploy : `python -m alembic upgrade head`
 - Start : `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 ### 3.3 Variables (onglet **Variables**)

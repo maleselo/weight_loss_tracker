@@ -71,6 +71,12 @@ Les mesures et le tableau de bord nécessitent un token.
 - `GET /api/dashboard/summary` — indicateurs (Δ 7j/30j, moyenne mobile 7j, tendance 14j)
 - `GET /api/dashboard/series/poids_kg?start=...&end=...` — courbe + moyenne mobile
 
+### Préparation déploiement Railway (phase 0)
+
+- Le dépôt GitHub ne doit **pas** contenir `backend/.env` ni `backend/.env.railway` (voir `.gitignore`).
+- CORS : variable `CORS_ORIGINS` (virgules) — voir `backend/.env.example`.
+- Secrets prod : copier `backend/.env.railway.example` → `backend/.env.railway`, remplir `JWT_SECRET`, puis coller les variables dans Railway. Mettre à jour `CORS_ORIGINS` une fois l’URL du frontend connue.
+
 ### Lancer les deux (dev)
 
 Terminal 1 — API :

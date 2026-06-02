@@ -1,6 +1,8 @@
 backend/.env
+backend/.env.railway
 frontend/.env
 .venv/
-__pycache__/
+**/__pycache__/
+*.py[cod]
 node_modules/
 dist/

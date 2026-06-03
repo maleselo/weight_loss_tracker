@@ -14,6 +14,35 @@ def _value_at_or_before(
     return None
 
 
+def _comparison_date_for_delta(rows: Sequence[tuple[dt.date, float]], days: int) -> dt.date | None:
+    if not rows:
+        return None
+    latest_date = rows[-1][0]
+    target = latest_date - dt.timedelta(days=days)
+    candidates = [d for d, _ in rows if d <= target]
+    if not candidates:
+        return None
+    comp_date = max(candidates)
+    if comp_date >= latest_date:
+        return None
+    if (latest_date - comp_date).days < days:
+        return None
+    return comp_date
+
+
+def _delta_days(rows: Sequence[tuple[dt.date, float]], days: int) -> float | None:
+    if len(rows) < 2:
+        return None
+    latest_date, latest_value = rows[-1]
+    comp_date = _comparison_date_for_delta(rows, days)
+    if comp_date is None:
+        return None
+    comp_value = _value_at_or_before(rows, comp_date)
+    if comp_value is None:
+        return None
+    return round(latest_value - comp_value, 2)
+
+
 def _moving_average(values: list[float | None], window: int = 7) -> list[float | None]:
     out: list[float | None] = []
     for i in range(len(values)):
@@ -45,22 +74,18 @@ def build_metric_summary(
     rows: Sequence[tuple[dt.date, float]],
     reference_date: dt.date,
 ) -> MetricSummary:
+    del reference_date  # deltas basés sur la dernière mesure réelle
     if not rows:
         return MetricSummary()
 
-    latest_date, latest_value = rows[-1]
-    _ = latest_date
-
-    val_7 = _value_at_or_before(rows, reference_date - dt.timedelta(days=7))
-    val_30 = _value_at_or_before(rows, reference_date - dt.timedelta(days=30))
-
+    latest_value = rows[-1][1]
     values_only = [v for _, v in rows]
-    ma7 = _moving_average(values_only)[-1] if values_only else None
+    ma7 = _moving_average(values_only)[-1] if len(values_only) >= 2 else None
 
     return MetricSummary(
         valeur_actuelle=latest_value,
-        delta_7j=round(latest_value - val_7, 2) if val_7 is not None else None,
-        delta_30j=round(latest_value - val_30, 2) if val_30 is not None else None,
+        delta_7j=_delta_days(rows, 7),
+        delta_30j=_delta_days(rows, 30),
         tendance_14j_par_jour=_linear_slope_per_day(rows),
         moyenne_mobile_7j=round(ma7, 2) if ma7 is not None else None,
     )
@@ -77,7 +102,7 @@ def build_series(
         SeriesPoint(
             date=d,
             valeur=v,
-            moyenne_mobile_7j=round(ma, 2) if ma is not None else None,
+            moyenne_mobile_7j=round(ma, 2) if ma is not None and len(values) >= 2 else None,
         )
         for (d, v), ma in zip(rows, ma_list, strict=True)
     ]

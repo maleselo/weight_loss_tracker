@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
-import { ScaleInput } from "../components/ScaleInput";
+import { SleepScaleInput } from "../components/SleepScaleInput";
+import { TextScaleInput } from "../components/TextScaleInput";
 import { useAuth } from "../context/AuthContext";
 import { formatDateFR, todayISO } from "../lib/dates";
 import type { DailyMeasurement } from "../types";
@@ -124,7 +125,8 @@ export function TodayPage() {
         {message && <div className="alert alert-success">{message}</div>}
         {error && <div className="alert alert-error">{error}</div>}
 
-        <form className="form-grid" onSubmit={onSubmit}>
+        <form className="form-grid form-grid--daily" onSubmit={onSubmit}>
+          <section className="form-section">
           <label className="field">
             Date de la mesure
             <input
@@ -140,7 +142,9 @@ export function TodayPage() {
               Revenir à aujourd&apos;hui
             </button>
           )}
+          </section>
 
+          <section className="form-section">
           <label className="field">
             Poids (kg)
             <input
@@ -198,7 +202,9 @@ export function TodayPage() {
               onChange={(e) => setNum("nb_pas", e.target.value)}
             />
           </label>
+          </section>
 
+          <section className="form-section">
           <div className="form-row form-row--2">
             <label className="field">
               Tension SYS (mmHg)
@@ -219,32 +225,47 @@ export function TodayPage() {
               />
             </label>
           </div>
+          </section>
 
-          <ScaleInput
+          <section className="form-section form-section--wellbeing">
+          <SleepScaleInput
             label="Qualité du sommeil"
-            name="sommeil"
             value={form.sommeil}
             onChange={(v) => setForm((f) => ({ ...f, sommeil: v }))}
           />
-          <ScaleInput
+          <TextScaleInput
             label="Niveau de stress"
-            name="stress"
+            options={[
+              { value: 1, label: "Faible" },
+              { value: 2, label: "Modéré" },
+              { value: 3, label: "Élevé" },
+            ]}
             value={form.stress}
             onChange={(v) => setForm((f) => ({ ...f, stress: v }))}
           />
-          <ScaleInput
+          <TextScaleInput
             label="Niveau d'énergie"
-            name="energie"
+            options={[
+              { value: 1, label: "Faible" },
+              { value: 2, label: "Normal" },
+              { value: 3, label: "Excellent" },
+            ]}
             value={form.energie}
             onChange={(v) => setForm((f) => ({ ...f, energie: v }))}
           />
-          <ScaleInput
+          <TextScaleInput
             label="Niveau de faim"
-            name="faim"
+            options={[
+              { value: 1, label: "Nulle" },
+              { value: 2, label: "Modérée" },
+              { value: 3, label: "Forte" },
+            ]}
             value={form.faim}
             onChange={(v) => setForm((f) => ({ ...f, faim: v }))}
           />
+          </section>
 
+          <section className="form-section">
           <div className="checkbox-row">
             <label>
               <input
@@ -282,6 +303,7 @@ export function TodayPage() {
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))}
             />
           </label>
+          </section>
 
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Enregistrement…" : "Enregistrer"}

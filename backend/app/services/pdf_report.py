@@ -5,7 +5,6 @@ from typing import Sequence
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -15,6 +14,7 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Tabl
 
 from app.models.daily_measurement import DailyMeasurement
 from app.models.user import User
+from app.services.chart_dates import configure_weight_chart_axis
 from app.services.dashboard import build_metric_summary, extract_metric_rows
 
 MONTHS_FR = (
@@ -79,8 +79,7 @@ def _build_weight_chart(
     ax.set_title("Évolution du poids")
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
-    fig.autofmt_xdate()
+    configure_weight_chart_axis(ax, dates)
     fig.tight_layout()
 
     buf = io.BytesIO()
@@ -96,6 +95,9 @@ def build_health_report_pdf(
     measurements: Sequence[DailyMeasurement],
     start: dt.date,
     end: dt.date,
+    include_chart: bool = True,
+    include_table: bool = True,
+    include_context: bool = True,
 ) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -175,88 +177,99 @@ def build_health_report_pdf(
     story.append(summary_table)
     story.append(Spacer(1, 0.4 * cm))
 
-    chart_buf = _build_weight_chart(measurements, poids_cible)
-    if chart_buf:
-        story.append(Paragraph("Graphique", section_style))
-        story.append(Image(chart_buf, width=16 * cm, height=6.5 * cm))
-        story.append(Spacer(1, 0.3 * cm))
+    if include_chart:
+        chart_buf = _build_weight_chart(measurements, poids_cible)
+        if chart_buf:
+            story.append(Paragraph("Graphique", section_style))
+            story.append(Image(chart_buf, width=16 * cm, height=6.5 * cm))
+            story.append(Spacer(1, 0.3 * cm))
 
-    story.append(Paragraph("Détail journalier", section_style))
-    table_header = [
-        "Date",
-        "Poids",
-        "% MG",
-        "Tension",
-        "Pas",
-        "Somm.",
-        "Stress",
-        "Notes",
-    ]
-    table_rows = [table_header]
-    for m in sorted(measurements, key=lambda x: x.date):
-        tension = (
-            f"{m.tension_sys_mmhg}/{m.tension_dia_mmhg}"
-            if m.tension_sys_mmhg is not None and m.tension_dia_mmhg is not None
-            else "—"
-        )
-        notes = (m.notes or "").replace("\n", " ").strip()
-        if len(notes) > 48:
-            notes = notes[:45] + "…"
-        table_rows.append(
-            [
-                m.date.strftime("%d/%m/%Y"),
-                _fmt_num(float(m.poids_kg) if m.poids_kg is not None else None, " kg"),
-                _fmt_num(float(m.masse_grasse_pct) if m.masse_grasse_pct is not None else None, " %"),
-                tension,
-                _fmt_num(m.nb_pas),
-                _fmt_num(m.sommeil),
-                _fmt_num(m.stress),
-                notes or "—",
-            ]
-        )
+    if include_table:
+        story.append(Paragraph("Détail journalier", section_style))
+        table_header = [
+            "Date",
+            "Poids",
+            "% MG",
+            "Tension",
+            "Pas",
+            "Somm.",
+            "Stress",
+            "Énergie",
+            "Faim",
+        ]
+        table_rows = [table_header]
+        for m in sorted(measurements, key=lambda x: x.date):
+            tension = (
+                f"{m.tension_sys_mmhg}/{m.tension_dia_mmhg}"
+                if m.tension_sys_mmhg is not None and m.tension_dia_mmhg is not None
+                else "—"
+            )
+            table_rows.append(
+                [
+                    m.date.strftime("%d/%m/%Y"),
+                    _fmt_num(float(m.poids_kg) if m.poids_kg is not None else None, " kg"),
+                    _fmt_num(float(m.masse_grasse_pct) if m.masse_grasse_pct is not None else None, " %"),
+                    tension,
+                    _fmt_num(m.nb_pas),
+                    _fmt_num(m.sommeil),
+                    _fmt_num(m.stress),
+                    _fmt_num(m.energie),
+                    _fmt_num(m.faim),
+                ]
+            )
 
-    col_widths = [2.2 * cm, 1.5 * cm, 1.3 * cm, 2 * cm, 1.5 * cm, 1.2 * cm, 1.2 * cm, 4.1 * cm]
-    data_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
-    data_table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 7),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
-            ]
+        col_widths = [2.2 * cm, 1.5 * cm, 1.3 * cm, 2 * cm, 1.5 * cm, 1.1 * cm, 1.1 * cm, 1.1 * cm, 1.1 * cm]
+        data_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+        data_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                ]
+            )
         )
-    )
-    story.append(data_table)
+        story.append(data_table)
 
-    flags_rows = [["Date", "Entraînement", "Alcool", "Cheat Meal"]]
-    for m in sorted(measurements, key=lambda x: x.date):
-        flags_rows.append(
-            [
-                m.date.strftime("%d/%m/%Y"),
-                _bool_fr(m.entrainement),
-                _bool_fr(m.alcool),
-                _bool_fr(m.cheat_meal),
-            ]
+    if include_context:
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(Paragraph("Contexte & notes", section_style))
+        context_rows = [["Date", "Entraînement", "Alcool", "Cheat Meal", "Notes"]]
+        for m in sorted(measurements, key=lambda x: x.date):
+            notes = (m.notes or "").replace("\n", " ").strip()
+            if len(notes) > 60:
+                notes = notes[:57] + "…"
+            context_rows.append(
+                [
+                    m.date.strftime("%d/%m/%Y"),
+                    _bool_fr(m.entrainement),
+                    _bool_fr(m.alcool),
+                    _bool_fr(m.cheat_meal),
+                    notes or "—",
+                ]
+            )
+        context_table = Table(
+            context_rows,
+            colWidths=[2.2 * cm, 2.5 * cm, 2 * cm, 2.5 * cm, 6.3 * cm],
+            repeatRows=1,
         )
-    story.append(Spacer(1, 0.4 * cm))
-    story.append(Paragraph("Contexte (oui/non)", section_style))
-    flags_table = Table(flags_rows, colWidths=[3 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm])
-    flags_table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#475569")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-            ]
+        context_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#475569")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]
+            )
         )
-    )
-    story.append(flags_table)
+        story.append(context_table)
 
     doc.build(story)
     buffer.seek(0)

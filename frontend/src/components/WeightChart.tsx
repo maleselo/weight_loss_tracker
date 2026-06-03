@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -11,6 +12,11 @@ import {
 } from "recharts";
 import type { SeriesPoint } from "../types";
 import { formatDateFR } from "../lib/dates";
+import {
+  chartSpanDays,
+  formatChartAxisLabel,
+  pickChartTickIndices,
+} from "../lib/chartAxis";
 
 interface Props {
   points: SeriesPoint[];
@@ -19,14 +25,17 @@ interface Props {
 }
 
 export function WeightChart({ points, poidsCible, unit = " kg" }: Props) {
+  const axis = useMemo(() => {
+    const dates = points.map((p) => p.date);
+    const span = chartSpanDays(dates);
+    const tickIndices = pickChartTickIndices(points.length, span);
+    const ticks = tickIndices.map((i) => points[i].date);
+    return { span, ticks };
+  }, [points]);
+
   if (points.length === 0) {
     return <p className="empty">Pas encore de données pour afficher une courbe.</p>;
   }
-
-  const data = points.map((p) => ({
-    ...p,
-    label: formatDateFR(p.date),
-  }));
 
   const values = points.map((p) => p.valeur).filter((v): v is number => v != null);
   const yMin = Math.min(...values, ...(poidsCible != null ? [poidsCible] : []));
@@ -36,9 +45,17 @@ export function WeightChart({ points, poidsCible, unit = " kg" }: Props) {
   return (
     <div className="chart-wrap">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+          <XAxis
+            dataKey="date"
+            ticks={axis.ticks}
+            tick={{ fontSize: 10 }}
+            tickFormatter={(iso: string) => formatChartAxisLabel(iso, axis.span)}
+            interval={0}
+            minTickGap={28}
+            height={48}
+          />
           <YAxis
             tick={{ fontSize: 11 }}
             domain={[yMin - padding, yMax + padding]}

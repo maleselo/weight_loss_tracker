@@ -12,6 +12,8 @@ class HealthSyncRecord(BaseModel):
     blood_pressure_sys: int | None = Field(default=None, ge=60, le=250)
     blood_pressure_dia: int | None = Field(default=None, ge=30, le=150)
     sleep_quality: int | None = Field(default=None, ge=1, le=3)
+    stress_level: int | None = Field(default=None, ge=1, le=3)
+    energy_level: int | None = Field(default=None, ge=1, le=3)
 
     def to_measurement_fields(self) -> dict[str, object]:
         raw = self.model_dump(exclude_unset=True, exclude={"date"})
@@ -23,6 +25,8 @@ class HealthSyncRecord(BaseModel):
             "blood_pressure_sys": "tension_sys_mmhg",
             "blood_pressure_dia": "tension_dia_mmhg",
             "sleep_quality": "sommeil",
+            "stress_level": "stress",
+            "energy_level": "energie",
         }
         return {mapping[k]: v for k, v in raw.items() if k in mapping}
 

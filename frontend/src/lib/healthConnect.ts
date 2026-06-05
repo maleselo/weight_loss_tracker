@@ -1,5 +1,10 @@
 import { Capacitor } from "@capacitor/core";
 import { computeSleepQualityScore } from "./sleepScore";
+import {
+  computeEnergyLevel,
+  computeStressLevel,
+  medianRestingHrBaseline,
+} from "./wellbeingScore";
 
 export interface LocalSyncRecord {
   date: string;
@@ -10,6 +15,8 @@ export interface LocalSyncRecord {
   blood_pressure_sys?: number;
   blood_pressure_dia?: number;
   sleep_quality?: number;
+  stress_level?: number;
+  energy_level?: number;
 }
 
 export type NativeHealthPlatform = "android" | "ios" | "web";
@@ -30,6 +37,7 @@ const HEALTH_READ_TYPES = [
   "bodyFat",
   "bloodPressure",
   "sleep",
+  "heartRateVariability",
 ] as const;
 type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
 
@@ -41,6 +49,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   bodyFat: "masse grasse (%)",
   bloodPressure: "tension",
   sleep: "sommeil",
+  heartRateVariability: "variabilité cardiaque (HRV)",
 };
 
 export function isMobileBrowser(): boolean {
@@ -84,12 +93,16 @@ export function summarizeHealthRecords(records: LocalSyncRecord[]): string {
   const hr = count((r) => r.resting_heart_rate != null);
   const bp = count((r) => r.blood_pressure_sys != null && r.blood_pressure_dia != null);
   const sleep = count((r) => r.sleep_quality != null);
+  const stress = count((r) => r.stress_level != null);
+  const energy = count((r) => r.energy_level != null);
   if (steps) parts.push(`${steps} j. de pas`);
   if (weight) parts.push(`${weight} j. de poids`);
   if (bf) parts.push(`${bf} j. de masse grasse`);
   if (hr) parts.push(`${hr} j. de FC`);
   if (bp) parts.push(`${bp} j. de tension`);
   if (sleep) parts.push(`${sleep} j. de sommeil`);
+  if (stress) parts.push(`${stress} j. de stress`);
+  if (energy) parts.push(`${energy} j. d'énergie`);
   return parts.length ? parts.join(", ") : "aucune métrique";
 }
 
@@ -357,6 +370,54 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
     ensureDay(byDate, key).sleep_quality = computeSleepQualityScore(session);
   }
 
+  const hrvByDay = new Map<string, number[]>();
+  if (readAuthorized.has("heartRateVariability")) {
+    const hrvResult = await readSamplesSafe(Health, "heartRateVariability", startIso, endIso, 0);
+    for (const sample of hrvResult.samples ?? []) {
+      const ms = sample.value;
+      if (ms == null || Number.isNaN(ms) || ms <= 0) continue;
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const values = hrvByDay.get(key) ?? [];
+      values.push(ms);
+      hrvByDay.set(key, values);
+    }
+  }
+
+  const restingByDate = new Map<string, number>();
+  for (const [date, row] of byDate) {
+    if (row.resting_heart_rate != null) {
+      restingByDate.set(date, row.resting_heart_rate);
+    }
+  }
+
+  for (const [date, row] of byDate) {
+    const hrvValues = hrvByDay.get(date);
+    const hrvAvgMs =
+      hrvValues && hrvValues.length > 0
+        ? hrvValues.reduce((sum, v) => sum + v, 0) / hrvValues.length
+        : undefined;
+    const baseline = medianRestingHrBaseline(restingByDate, date);
+    const baselineMedianHr = baseline?.median;
+    const baselineDayCount = baseline?.count ?? 0;
+
+    const stress = computeStressLevel({
+      hrvAvgMs,
+      restingHeartRate: row.resting_heart_rate,
+      baselineMedianHr,
+      baselineDayCount,
+    });
+    if (stress != null) row.stress_level = stress;
+
+    const energy = computeEnergyLevel({
+      sleepQuality: row.sleep_quality,
+      hrvAvgMs,
+      restingHeartRate: row.resting_heart_rate,
+      baselineMedianHr,
+      baselineDayCount,
+    });
+    if (energy != null) row.energy_level = energy;
+  }
+
   return [...byDate.values()]
     .filter(
       (r) =>
@@ -365,7 +426,9 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
         r.body_fat_percentage != null ||
         r.resting_heart_rate != null ||
         (r.blood_pressure_sys != null && r.blood_pressure_dia != null) ||
-        r.sleep_quality != null,
+        r.sleep_quality != null ||
+        r.stress_level != null ||
+        r.energy_level != null,
     )
     .sort((a, b) => a.date.localeCompare(b.date));
 }

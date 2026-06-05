@@ -10,6 +10,7 @@ from app.schemas.integrations import HealthSyncRecord
 from app.services.measurements import upsert_daily_measurement
 
 PROVIDER_HEALTH_CONNECT = "health_connect"
+MANUAL_PRESERVE_FIELDS = ("sommeil", "stress", "energie")
 
 
 def get_connection(db: Session, user_id: int, provider: str = PROVIDER_HEALTH_CONNECT) -> HealthConnection | None:
@@ -57,15 +58,18 @@ def sync_records(
         fields = record.to_measurement_fields()
         if not fields:
             continue
-        if "sommeil" in fields:
+        preserve = [f for f in MANUAL_PRESERVE_FIELDS if f in fields]
+        if preserve:
             existing = db.scalars(
                 select(DailyMeasurement).where(
                     DailyMeasurement.user_id == user_id,
                     DailyMeasurement.date == record.date,
                 )
             ).first()
-            if existing is not None and existing.sommeil is not None:
-                del fields["sommeil"]
+            if existing is not None:
+                for field in preserve:
+                    if getattr(existing, field) is not None:
+                        fields.pop(field, None)
         if not fields:
             continue
         try:

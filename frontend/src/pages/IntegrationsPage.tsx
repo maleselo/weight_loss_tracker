@@ -119,10 +119,10 @@ export function IntegrationsPage() {
             )}
           </div>
           <p className="sub integration-hint">
-            Import automatique : pas, poids, masse grasse (%), FC (repos ou min. journalière),
-            tension et sommeil (score 😞😐😊 calculé depuis Health Connect).
+            Import automatique : pas, poids, masse grasse (%), FC, tension, sommeil (😞😐😊),
+            stress et énergie (calculés uniquement si HRV, FC ou sommeil suffisants).
             Choisissez une période courte si vos données récentes sont incomplètes.
-            Stress et notes : saisie manuelle dans l&apos;onglet Aujourd&apos;hui.
+            Faim et notes : saisie manuelle dans l&apos;onglet Aujourd&apos;hui.
           </p>
         </section>
       </div>

@@ -122,6 +122,7 @@ export function IntegrationsPage() {
             Import automatique : pas, poids, masse grasse (%), FC, tension, sommeil (😞😐😊),
             stress et énergie (calculés uniquement si HRV, FC ou sommeil suffisants).
             Choisissez une période courte si vos données récentes sont incomplètes.
+            Les champs modifiés dans Aujourd&apos;hui (✎) ne sont pas écrasés à la sync.
             Faim et notes : saisie manuelle dans l&apos;onglet Aujourd&apos;hui.
           </p>
         </section>

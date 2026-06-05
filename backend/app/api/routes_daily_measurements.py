@@ -14,6 +14,7 @@ from app.schemas.daily_measurement import (
     DailyMeasurementOut,
     DailyMeasurementUpdate,
 )
+from app.services.manual_overrides import normalize_manual_overrides
 
 router = APIRouter()
 
@@ -64,8 +65,12 @@ def upsert_measure(
         db.add(obj)
 
     data = payload.model_dump(exclude_unset=True)
+    if "manual_overrides" in data:
+        obj.manual_overrides = normalize_manual_overrides(data.pop("manual_overrides"))
     for k, v in data.items():
         setattr(obj, k, v)
+    if data:
+        obj.source = "manual"
 
     try:
         db.commit()

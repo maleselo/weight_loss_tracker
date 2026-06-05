@@ -228,6 +228,25 @@ label.field textarea:focus {
   border-color: var(--teal-600);
 }
 
+.field-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.field-lock {
+  font-size: 0.85rem;
+  color: var(--teal-700);
+  line-height: 1;
+}
+
+.form-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
 .checkbox-row {
   display: flex;
   flex-wrap: wrap;

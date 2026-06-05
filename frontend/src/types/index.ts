@@ -29,6 +29,7 @@ export interface DailyMeasurement {
   alcool: boolean;
   cheat_meal: boolean;
   notes: string | null;
+  manual_overrides: string[];
 }
 
 export interface MetricSummary {

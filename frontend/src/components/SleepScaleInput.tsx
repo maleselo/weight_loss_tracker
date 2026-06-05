@@ -1,7 +1,10 @@
+import { FieldLockHint } from "./FieldLockHint";
+
 interface Props {
   label: string;
   value: number | null;
   onChange: (v: number | null) => void;
+  userLocked?: boolean;
 }
 
 const OPTIONS = [
@@ -10,10 +13,13 @@ const OPTIONS = [
   { value: 3, emoji: "😊", title: "Bon" },
 ] as const;
 
-export function SleepScaleInput({ label, value, onChange }: Props) {
+export function SleepScaleInput({ label, value, onChange, userLocked }: Props) {
   return (
     <div className="field scale-field">
-      <span>{label}</span>
+      <span className="field-label-row">
+        {label}
+        <FieldLockHint locked={userLocked} />
+      </span>
       <div className="scale-buttons scale-buttons--emoji" role="group" aria-label={label}>
         {OPTIONS.map((opt) => (
           <button

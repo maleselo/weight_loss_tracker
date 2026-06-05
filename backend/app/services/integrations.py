@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.models.daily_measurement import DailyMeasurement
 from app.models.health_connection import HealthConnection
 from app.schemas.integrations import HealthSyncRecord
+from app.services.manual_overrides import filter_sync_fields
 from app.services.measurements import upsert_daily_measurement
 
 PROVIDER_HEALTH_CONNECT = "health_connect"
-MANUAL_PRESERVE_FIELDS = ("sommeil", "stress", "energie")
 
 
 def get_connection(db: Session, user_id: int, provider: str = PROVIDER_HEALTH_CONNECT) -> HealthConnection | None:
@@ -52,24 +52,22 @@ def sync_records(
 ) -> tuple[int, HealthConnection]:
     conn = connect_provider(db, user_id, provider)
     synced = 0
+    skipped_fields = 0
     errors: list[str] = []
 
     for record in records:
         fields = record.to_measurement_fields()
         if not fields:
             continue
-        preserve = [f for f in MANUAL_PRESERVE_FIELDS if f in fields]
-        if preserve:
-            existing = db.scalars(
-                select(DailyMeasurement).where(
-                    DailyMeasurement.user_id == user_id,
-                    DailyMeasurement.date == record.date,
-                )
-            ).first()
-            if existing is not None:
-                for field in preserve:
-                    if getattr(existing, field) is not None:
-                        fields.pop(field, None)
+        existing = db.scalars(
+            select(DailyMeasurement).where(
+                DailyMeasurement.user_id == user_id,
+                DailyMeasurement.date == record.date,
+            )
+        ).first()
+        overrides = existing.manual_overrides if existing is not None else []
+        fields, skipped = filter_sync_fields(fields, overrides)
+        skipped_fields += len(skipped)
         if not fields:
             continue
         try:
@@ -95,11 +93,20 @@ def sync_records(
         conn.last_sync_status = "partial"
         conn.last_sync_message = "; ".join(errors[:3])
     elif synced == 0:
-        conn.last_sync_status = "empty"
-        conn.last_sync_message = "Aucune donnée à importer."
+        if skipped_fields:
+            conn.last_sync_status = "success"
+            conn.last_sync_message = (
+                f"Aucune mise à jour — {skipped_fields} champ(s) ignoré(s) (modifiés par vous)."
+            )
+        else:
+            conn.last_sync_status = "empty"
+            conn.last_sync_message = "Aucune donnée à importer."
     else:
         conn.last_sync_status = "success"
-        conn.last_sync_message = f"{synced} jour(s) synchronisé(s)."
+        msg = f"{synced} jour(s) synchronisé(s)."
+        if skipped_fields:
+            msg += f" {skipped_fields} champ(s) ignoré(s) (modifiés par vous)."
+        conn.last_sync_message = msg
     db.commit()
     db.refresh(conn)
     return synced, conn

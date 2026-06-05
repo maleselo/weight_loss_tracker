@@ -1,15 +1,18 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
+import { FieldLockHint } from "../components/FieldLockHint";
 import { SleepScaleInput } from "../components/SleepScaleInput";
 import { TextScaleInput } from "../components/TextScaleInput";
 import { useAuth } from "../context/AuthContext";
 import { formatDateFR, todayISO } from "../lib/dates";
-import type { DailyMeasurement } from "../types";
+import {
+  detectDirtyMeasureFields,
+  mergeManualOverrides,
+  type MeasureFormValues,
+} from "../lib/measureFields";
 
-type MeasureForm = Omit<DailyMeasurement, "id" | "date">;
-
-function createEmptyForm(): MeasureForm {
+function createEmptyForm(): MeasureFormValues {
   return {
     poids_kg: null,
     masse_grasse_pct: null,
@@ -29,24 +32,16 @@ function createEmptyForm(): MeasureForm {
   };
 }
 
-function measureToPayload(m: MeasureForm) {
+function measureToPayload(m: MeasureFormValues, manualOverrides: string[]) {
   return {
-    poids_kg: m.poids_kg,
-    masse_grasse_pct: m.masse_grasse_pct,
-    tour_taille_cm: m.tour_taille_cm,
-    tension_sys_mmhg: m.tension_sys_mmhg,
-    tension_dia_mmhg: m.tension_dia_mmhg,
-    fc_repos_bpm: m.fc_repos_bpm,
-    nb_pas: m.nb_pas,
-    sommeil: m.sommeil,
-    stress: m.stress,
-    energie: m.energie,
-    faim: m.faim,
-    entrainement: m.entrainement,
-    alcool: m.alcool,
-    cheat_meal: m.cheat_meal,
+    ...m,
     notes: m.notes || null,
+    manual_overrides: manualOverrides,
   };
+}
+
+function isLocked(field: string, overrides: string[]): boolean {
+  return overrides.includes(field);
 }
 
 export function TodayPage() {
@@ -57,7 +52,9 @@ export function TodayPage() {
   const date = searchParams.get("date") ?? today;
   const isToday = date === today;
 
-  const [form, setForm] = useState<MeasureForm>(createEmptyForm);
+  const [form, setForm] = useState<MeasureFormValues>(createEmptyForm);
+  const [baselineForm, setBaselineForm] = useState<MeasureFormValues>(createEmptyForm);
+  const [manualOverrides, setManualOverrides] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -81,17 +78,25 @@ export function TodayPage() {
     api
       .getMeasure(token, date)
       .then((m) => {
-        const { id: _, date: __, ...rest } = m;
+        const { id: _, date: __, manual_overrides, ...rest } = m;
         setForm(rest);
+        setBaselineForm(rest);
+        setManualOverrides(manual_overrides ?? []);
       })
       .catch((e) => {
-        if (e instanceof ApiError && e.status === 404) setForm(createEmptyForm());
-        else setError(e instanceof ApiError ? e.message : "Chargement impossible.");
+        if (e instanceof ApiError && e.status === 404) {
+          const empty = createEmptyForm();
+          setForm(empty);
+          setBaselineForm(empty);
+          setManualOverrides([]);
+        } else {
+          setError(e instanceof ApiError ? e.message : "Chargement impossible.");
+        }
       })
       .finally(() => setLoading(false));
   }, [token, date]);
 
-  function setNum<K extends keyof MeasureForm>(key: K, raw: string) {
+  function setNum<K extends keyof MeasureFormValues>(key: K, raw: string) {
     const v = raw === "" ? null : Number(raw);
     setForm((f) => ({ ...f, [key]: Number.isFinite(v) ? v : null }));
   }
@@ -103,7 +108,13 @@ export function TodayPage() {
     setError(null);
     setMessage(null);
     try {
-      await api.upsertMeasure(token, date, measureToPayload(form));
+      const dirty = detectDirtyMeasureFields(baselineForm, form);
+      const overrides = mergeManualOverrides(manualOverrides, dirty);
+      const saved = await api.upsertMeasure(token, date, measureToPayload(form, overrides));
+      const { id: _, date: __, manual_overrides, ...rest } = saved;
+      setForm(rest);
+      setBaselineForm(rest);
+      setManualOverrides(manual_overrides ?? []);
       setMessage(`Mesure enregistrée pour le ${formatDateFR(date)}.`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Enregistrement impossible.");
@@ -112,15 +123,35 @@ export function TodayPage() {
     }
   }
 
+  async function clearManualOverrides() {
+    if (!token) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const saved = await api.upsertMeasure(token, date, { manual_overrides: [] });
+      setManualOverrides(saved.manual_overrides ?? []);
+      setMessage(
+        "Verrous levés pour cette date. Synchronisez Health Connect pour réimporter les données.",
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Action impossible.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <p className="empty">Chargement…</p>;
+
+  const lock = (field: string) => isLocked(field, manualOverrides);
 
   return (
     <>
       <div className="card">
         <h2>{isToday ? "Aujourd'hui" : formatDateFR(date)}</h2>
         <p style={{ margin: "0 0 1rem", color: "var(--slate-600)", fontSize: "0.9rem" }}>
-          Saisie rapide — les champs sont optionnels. Tu peux choisir une date passée pour
-          rattraper une saisie.
+          Saisie rapide — les champs sont optionnels. Les champs marqués ✎ ne sont pas écrasés par
+          la synchronisation Health Connect.
         </p>
         {message && <div className="alert alert-success">{message}</div>}
         {error && <div className="alert alert-error">{error}</div>}
@@ -128,7 +159,9 @@ export function TodayPage() {
         <form className="form-grid form-grid--daily" onSubmit={onSubmit}>
           <section className="form-section">
           <label className="field">
-            Date de la mesure
+            <span className="field-label-row">
+              Date de la mesure
+            </span>
             <input
               type="date"
               value={date}
@@ -146,7 +179,10 @@ export function TodayPage() {
 
           <section className="form-section">
           <label className="field">
-            Poids (kg)
+            <span className="field-label-row">
+              Poids (kg)
+              <FieldLockHint locked={lock("poids_kg")} />
+            </span>
             <input
               type="number"
               inputMode="decimal"
@@ -159,7 +195,10 @@ export function TodayPage() {
 
           <div className="form-row form-row--3">
             <label className="field">
-              % masse grasse
+              <span className="field-label-row">
+                % masse grasse
+                <FieldLockHint locked={lock("masse_grasse_pct")} />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -169,7 +208,10 @@ export function TodayPage() {
               />
             </label>
             <label className="field">
-              Tour de taille (cm)
+              <span className="field-label-row">
+                Tour de taille (cm)
+                <FieldLockHint locked={lock("tour_taille_cm")} />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -179,7 +221,10 @@ export function TodayPage() {
               />
             </label>
             <label className="field">
-              FC repos (bpm)
+              <span className="field-label-row">
+                FC repos (bpm)
+                <FieldLockHint locked={lock("fc_repos_bpm")} />
+              </span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -190,7 +235,10 @@ export function TodayPage() {
           </div>
 
           <label className="field">
-            Nombre de pas
+            <span className="field-label-row">
+              Nombre de pas
+              <FieldLockHint locked={lock("nb_pas")} />
+            </span>
             <input
               type="number"
               inputMode="numeric"
@@ -207,7 +255,10 @@ export function TodayPage() {
           <section className="form-section">
           <div className="form-row form-row--2">
             <label className="field">
-              Tension SYS (mmHg)
+              <span className="field-label-row">
+                Tension SYS (mmHg)
+                <FieldLockHint locked={lock("tension_sys_mmhg")} />
+              </span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -216,7 +267,10 @@ export function TodayPage() {
               />
             </label>
             <label className="field">
-              Tension DIA (mmHg)
+              <span className="field-label-row">
+                Tension DIA (mmHg)
+                <FieldLockHint locked={lock("tension_dia_mmhg")} />
+              </span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -231,10 +285,12 @@ export function TodayPage() {
           <SleepScaleInput
             label="Qualité du sommeil"
             value={form.sommeil}
+            userLocked={lock("sommeil")}
             onChange={(v) => setForm((f) => ({ ...f, sommeil: v }))}
           />
           <TextScaleInput
             label="Niveau de stress"
+            userLocked={lock("stress")}
             options={[
               { value: 1, label: "Faible" },
               { value: 2, label: "Modéré" },
@@ -245,6 +301,7 @@ export function TodayPage() {
           />
           <TextScaleInput
             label="Niveau d'énergie"
+            userLocked={lock("energie")}
             options={[
               { value: 1, label: "Faible" },
               { value: 2, label: "Normal" },
@@ -255,6 +312,7 @@ export function TodayPage() {
           />
           <TextScaleInput
             label="Niveau de faim"
+            userLocked={lock("faim")}
             options={[
               { value: 1, label: "Nulle" },
               { value: 2, label: "Modérée" },
@@ -274,6 +332,7 @@ export function TodayPage() {
                 onChange={(e) => setForm((f) => ({ ...f, entrainement: e.target.checked }))}
               />
               Entraînement
+              <FieldLockHint locked={lock("entrainement")} />
             </label>
             <label>
               <input
@@ -282,6 +341,7 @@ export function TodayPage() {
                 onChange={(e) => setForm((f) => ({ ...f, alcool: e.target.checked }))}
               />
               Alcool
+              <FieldLockHint locked={lock("alcool")} />
             </label>
             <label>
               <input
@@ -290,11 +350,15 @@ export function TodayPage() {
                 onChange={(e) => setForm((f) => ({ ...f, cheat_meal: e.target.checked }))}
               />
               Repas plaisir
+              <FieldLockHint locked={lock("cheat_meal")} />
             </label>
           </div>
 
           <label className="field">
-            Notes
+            <span className="field-label-row">
+              Notes
+              <FieldLockHint locked={lock("notes")} />
+            </span>
             <textarea
               rows={3}
               maxLength={2000}
@@ -305,9 +369,21 @@ export function TodayPage() {
           </label>
           </section>
 
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? "Enregistrement…" : "Enregistrer"}
-          </button>
+          <div className="form-actions-row">
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </button>
+            {manualOverrides.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={saving}
+                onClick={clearManualOverrides}
+              >
+                Reprendre sync Health Connect
+              </button>
+            )}
+          </div>
         </form>
       </div>
     </>

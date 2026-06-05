@@ -1,6 +1,6 @@
 import datetime as dt
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -32,6 +32,7 @@ class DailyMeasurement(Base):
     cheat_meal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manual_overrides: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
 
     user = relationship("User", back_populates="measurements")

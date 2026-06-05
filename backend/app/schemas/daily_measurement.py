@@ -25,6 +25,7 @@ class DailyMeasurementBase(BaseModel):
     cheat_meal: bool = False
 
     notes: str | None = Field(default=None, max_length=2000)
+    manual_overrides: list[str] = Field(default_factory=list)
 
 
 class DailyMeasurementCreate(DailyMeasurementBase):
@@ -51,6 +52,7 @@ class DailyMeasurementUpdate(BaseModel):
     cheat_meal: bool | None = None
 
     notes: str | None = Field(default=None, max_length=2000)
+    manual_overrides: list[str] | None = None
 
 
 class DailyMeasurementOut(DailyMeasurementBase):

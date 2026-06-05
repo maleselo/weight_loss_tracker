@@ -7,6 +7,12 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
   },
+  plugins: {
+    // Requêtes natives → pas de blocage CORS depuis le WebView (https://localhost)
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 };
 
 export default config;

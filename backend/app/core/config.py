@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     # URLs frontend autorisées (séparées par des virgules)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # Origines WebView Capacitor (app Android/iOS) — toujours autorisées
+    _CAPACITOR_ORIGINS: tuple[str, ...] = (
+        "https://localhost",
+        "http://localhost",
+        "capacitor://localhost",
+    )
+
     # Sync externe (Tasker, Samsung Health bridge) — laisser vide pour désactiver
     health_sync_token: str = ""
     health_sync_user_email: str = ""
@@ -36,7 +43,11 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        for origin in self._CAPACITOR_ORIGINS:
+            if origin not in origins:
+                origins.append(origin)
+        return origins
 
 
 settings = Settings()

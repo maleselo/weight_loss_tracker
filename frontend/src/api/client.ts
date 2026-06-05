@@ -53,7 +53,15 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(apiUrl(path), { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), { ...init, headers });
+  } catch {
+    throw new ApiError(
+      0,
+      "Connexion impossible — vérifiez votre réseau ou réinstallez la dernière version de l'application Android.",
+    );
+  }
   if (res.status === 204) return undefined as T;
   if (!res.ok) {
     let detail = res.statusText;

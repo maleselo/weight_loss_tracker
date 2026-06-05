@@ -1,12 +1,16 @@
 import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import packageJson from "./package.json";
 
 /** Build web Railway (/) vs APK Capacitor (./, sans service worker). */
 const forCapacitor = process.env.CAPACITOR === "true";
 
 export default defineConfig({
   base: forCapacitor ? "./" : "/",
+  define: {
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(packageJson.version),
+  },
   plugins: [
     react(),
     ...(!forCapacitor

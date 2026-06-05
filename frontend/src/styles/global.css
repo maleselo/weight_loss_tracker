@@ -59,10 +59,25 @@ textarea {
   padding: 1rem 1.25rem 0.5rem;
 }
 
+.app-header__title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .app-header h1 {
   margin: 0;
   font-size: 1.35rem;
   color: var(--teal-900);
+}
+
+.app-version {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--slate-500);
+  letter-spacing: 0.02em;
 }
 
 .app-header p {
@@ -476,6 +491,11 @@ label.field textarea:focus {
   margin-top: 1rem;
   font-size: 0.9rem;
   color: var(--slate-600);
+}
+
+.auth-version {
+  text-align: center;
+  margin: 1.5rem 0 0;
 }
 
 .chart-wrap {

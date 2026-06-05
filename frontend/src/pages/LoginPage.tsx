@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { AppVersion } from "../components/AppVersion";
 import { getAuthErrorMessage, useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
@@ -61,6 +62,9 @@ export function LoginPage() {
       </form>
       <p className="auth-footer">
         Pas de compte ? <Link to="/inscription">Créer un compte</Link>
+      </p>
+      <p className="auth-version">
+        <AppVersion />
       </p>
     </div>
   );

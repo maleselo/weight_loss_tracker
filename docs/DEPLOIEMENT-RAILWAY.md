@@ -57,10 +57,28 @@ Copier depuis `backend/.env.railway` (fichier local) :
 | `JWT_SECRET` | valeur dans `.env.railway` (**pas** celle du `.env` local) |
 | `JWT_EXPIRE_MINUTES` | `10080` |
 | `DATABASE_URL` | **Variable Reference** → service Postgres → `DATABASE_URL` |
+| `FRONTEND_URL` | URL publique du frontend (ex. `https://web-production-e3f6a.up.railway.app`) — lien dans l’email de reset |
 
 > `DATABASE_URL` Railway (`postgresql://…`) est converti automatiquement en `postgresql+psycopg://` par l’app.
 
 `CORS_ORIGINS` : mettre l’URL du frontend **après** l’étape 4 (puis **Redeploy** api).
+
+### 3.3.1 Email « mot de passe oublié » (SMTP)
+
+Sans variables SMTP, l’API répond toujours « email envoyé » (sécurité) mais **aucun email ne part** — un avertissement apparaît dans les logs Railway.
+
+Ajouter sur le service **api** (exemple [Resend](https://resend.com) avec domaine vérifié) :
+
+| Variable | Exemple |
+|----------|---------|
+| `SMTP_HOST` | `smtp.resend.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | `resend` |
+| `SMTP_PASSWORD` | clé API `re_…` |
+| `SMTP_FROM` | adresse expéditeur vérifiée chez le fournisseur (ex. `onboarding@resend.dev` en test Resend) |
+| `SMTP_USE_TLS` | `true` |
+
+Puis **Redeploy** api. Tester via la page « Mot de passe oublié » ; en cas d’échec SMTP, consulter les logs du service **api**.
 
 ### 3.4 Domaine public
 
@@ -101,7 +119,7 @@ Noter : **`https://<web>.up.railway.app`**
 
 ### 4.5 Finaliser CORS sur **api**
 
-1. Service **api** → **Variables** → `CORS_ORIGINS` = `https://<web>.up.railway.app`
+1. Service **api** → **Variables** → `CORS_ORIGINS` = `https://web-production-e3f6a.up.railway.app`
 2. Mettre à jour `backend/.env.railway` en local (pour mémoire)
 3. **Redeploy** le service **api**
 
@@ -117,6 +135,8 @@ Noter : **`https://<web>.up.railway.app`**
 **En cas d’erreur CORS** (console navigateur) : `CORS_ORIGINS` doit être exactement l’URL du front (https, sans slash final).
 
 **En cas d’API injoignable** : vérifier `VITE_API_URL` sur **web** puis **Redeploy** (rebuild nécessaire).
+
+**Mot de passe oublié sans email** : vérifier `SMTP_HOST`, `SMTP_FROM`, `SMTP_PASSWORD` et `FRONTEND_URL` sur **api** (voir § 3.3.1).
 
 ---
 

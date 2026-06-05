@@ -33,10 +33,17 @@ def _smtp_configured() -> bool:
     return bool(settings.smtp_host and settings.smtp_from)
 
 
-def send_password_reset_email(to_email: str, reset_url: str) -> None:
+def send_password_reset_email(to_email: str, reset_url: str) -> bool:
+    """Envoie l'email. Retourne True si envoyé, False si SMTP absent ou échec."""
     if not _smtp_configured():
-        logger.info("SMTP non configuré — lien de réinitialisation : %s", reset_url)
-        return
+        if settings.environment == "production":
+            logger.warning(
+                "SMTP non configuré (SMTP_HOST / SMTP_FROM) — aucun email envoyé pour %s",
+                to_email,
+            )
+        else:
+            logger.info("SMTP non configuré — lien de réinitialisation : %s", reset_url)
+        return False
 
     msg = EmailMessage()
     msg["Subject"] = "Réinitialisation de votre mot de passe"
@@ -50,12 +57,22 @@ def send_password_reset_email(to_email: str, reset_url: str) -> None:
         "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.\n"
     )
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-        if settings.smtp_use_tls:
-            smtp.starttls()
-        if settings.smtp_user:
-            smtp.login(settings.smtp_user, settings.smtp_password)
-        smtp.send_message(msg)
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
+            if settings.smtp_use_tls:
+                smtp.starttls()
+            if settings.smtp_user:
+                smtp.login(settings.smtp_user, settings.smtp_password)
+            smtp.send_message(msg)
+    except Exception:
+        logger.exception(
+            "Échec envoi email de réinitialisation vers %s (host=%s port=%s)",
+            to_email,
+            settings.smtp_host,
+            settings.smtp_port,
+        )
+        return False
+    return True
 
 
 def request_password_reset(db: Session, email: str) -> str | None:
@@ -79,9 +96,9 @@ def request_password_reset(db: Session, email: str) -> str | None:
     db.commit()
 
     reset_url = _reset_url(raw_token)
-    send_password_reset_email(user.email, reset_url)
+    sent = send_password_reset_email(user.email, reset_url)
 
-    if settings.environment == "dev" and not _smtp_configured():
+    if settings.environment == "dev" and not sent:
         return reset_url
     return None
 

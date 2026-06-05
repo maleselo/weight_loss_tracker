@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { AppVersion } from "./AppVersion";
 import { useAuth } from "../context/AuthContext";
 
 export function Layout() {
@@ -8,7 +9,10 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>Tableau de bord santé</h1>
+        <div className="app-header__title-row">
+          <h1>Tableau de bord santé</h1>
+          <AppVersion />
+        </div>
         <p>{user?.email}</p>
         <button
           type="button"

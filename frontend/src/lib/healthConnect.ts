@@ -12,9 +12,31 @@ export interface LocalSyncRecord {
 
 export type NativeHealthPlatform = "android" | "ios" | "web";
 
+/** Contexte d'exécution pour la sync santé */
+export type HealthSyncContext =
+  | "native-android"
+  | "native-ios"
+  | "mobile-browser"
+  | "desktop-browser";
+
+export function isMobileBrowser(): boolean {
+  if (Capacitor.isNativePlatform()) return false;
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+export function getHealthSyncContext(): HealthSyncContext {
+  if (Capacitor.isNativePlatform()) {
+    return Capacitor.getPlatform() === "ios" ? "native-ios" : "native-android";
+  }
+  return isMobileBrowser() ? "mobile-browser" : "desktop-browser";
+}
+
 export function getNativeHealthPlatform(): NativeHealthPlatform {
-  if (!Capacitor.isNativePlatform()) return "web";
-  return Capacitor.getPlatform() === "ios" ? "ios" : "android";
+  const ctx = getHealthSyncContext();
+  if (ctx === "native-ios") return "ios";
+  if (ctx === "native-android") return "android";
+  return "web";
 }
 
 export function isNativeHealthAvailable(): boolean {
@@ -22,10 +44,11 @@ export function isNativeHealthAvailable(): boolean {
 }
 
 export function nativePlatformLabel(): string {
-  const p = getNativeHealthPlatform();
-  if (p === "android") return "Android (Health Connect)";
-  if (p === "ios") return "iPhone (Apple Health)";
-  return "navigateur web";
+  const ctx = getHealthSyncContext();
+  if (ctx === "native-android") return "Android (Health Connect)";
+  if (ctx === "native-ios") return "iPhone (Apple Health)";
+  if (ctx === "mobile-browser") return "navigateur mobile (non compatible)";
+  return "navigateur ordinateur";
 }
 
 function toLocalDateKey(iso: string): string {

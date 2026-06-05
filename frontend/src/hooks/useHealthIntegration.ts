@@ -1,26 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
 import {
-  getNativeHealthPlatform,
+  getHealthSyncContext,
   isNativeHealthAvailable,
   readPlatformHealthData,
 } from "../lib/healthConnect";
 import type { IntegrationStatus } from "../types";
 
+function nativeRequiredHint(): string {
+  const ctx = getHealthSyncContext();
+  if (ctx === "mobile-browser") {
+    return "Impossible depuis le navigateur du téléphone. Installez l'application native (APK), ouvrez-la, puis revenez dans Connexions.";
+  }
+  if (ctx === "desktop-browser") {
+    return "Ouvrez l'application installée sur votre téléphone, pas le navigateur de l'ordinateur.";
+  }
+  return "Disponible uniquement dans l'application mobile installée.";
+}
+
 function emptyDataHint(): string {
-  const platform = getNativeHealthPlatform();
-  if (platform === "ios") {
+  const ctx = getHealthSyncContext();
+  if (ctx === "native-ios") {
     return "Aucune donnée trouvée. Vérifiez que vos apps (Apple Watch, Fitbit, Oura…) partagent vers Apple Health, puis Réglages → Santé → Données d'accès.";
   }
   return "Aucune donnée trouvée. Configurez d'abord votre app santé vers Health Connect (voir les guides ci-dessous), puis réessayez.";
-}
-
-function nativeRequiredHint(): string {
-  const platform = getNativeHealthPlatform();
-  if (platform === "web") {
-    return "Ouvrez cette page depuis l'application mobile installée sur votre téléphone (Android ou iPhone).";
-  }
-  return "Disponible uniquement dans l'application mobile installée.";
 }
 
 export function useHealthIntegration(token: string | null) {
@@ -88,7 +91,7 @@ export function useHealthIntegration(token: string | null) {
     setMessage(null);
     try {
       if (!isNativeHealthAvailable()) {
-        setError("La synchronisation nécessite l'application mobile (Android ou iPhone).");
+        setError(nativeRequiredHint());
         return;
       }
       const records = await readPlatformHealthData(30);
@@ -135,7 +138,7 @@ export function useHealthIntegration(token: string | null) {
     syncNow,
     disconnect,
     isNative: isNativeHealthAvailable(),
-    platform: getNativeHealthPlatform(),
+    syncContext: getHealthSyncContext(),
   };
 }
 

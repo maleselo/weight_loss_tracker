@@ -1,12 +1,14 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
+import { FieldLabelWithOverride } from "../components/FieldLabelWithOverride";
 import { FieldOverrideStatus } from "../components/FieldOverrideStatus";
 import { ManualOverridesPanel } from "../components/ManualOverridesPanel";
 import { SleepScaleInput } from "../components/SleepScaleInput";
 import { TextScaleInput } from "../components/TextScaleInput";
 import { useAuth } from "../context/AuthContext";
 import { formatDateFR, todayISO } from "../lib/dates";
+import { HEALTH_TODAY_SYNCED_EVENT } from "../lib/healthConnect";
 import { formatFieldList } from "../lib/measureFieldLabels";
 import {
   detectDirtyMeasureFields,
@@ -59,6 +61,7 @@ export function TodayPage() {
   const [form, setForm] = useState<MeasureFormValues>(createEmptyForm);
   const [baselineForm, setBaselineForm] = useState<MeasureFormValues>(createEmptyForm);
   const [manualOverrides, setManualOverrides] = useState<string[]>([]);
+  const [healthSyncActive, setHealthSyncActive] = useState(false);
   const [syncRestoredFields, setSyncRestoredFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,33 +78,61 @@ export function TodayPage() {
     }
   }
 
-  useEffect(() => {
-    if (!token) return;
-    setLoading(true);
-    setMessage(null);
-    setError(null);
-    api
-      .getMeasure(token, date)
-      .then((m) => {
-        const { id: _, date: __, manual_overrides, ...rest } = m;
-        setForm(rest);
-        setBaselineForm(rest);
-        setManualOverrides(manual_overrides ?? []);
-        setSyncRestoredFields(new Set());
-      })
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 404) {
+  const loadDay = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!token) return;
+      if (!opts?.silent) {
+        setLoading(true);
+        setMessage(null);
+        setError(null);
+      }
+
+      const measurePromise = api.getMeasure(token, date).catch((e) => {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      });
+      const integrationPromise = api.integrationStatus(token).catch(() => ({ connected: false }));
+
+      try {
+        const [measure, integration] = await Promise.all([measurePromise, integrationPromise]);
+        setHealthSyncActive(integration.connected);
+        if (measure) {
+          const { id: _, date: __, manual_overrides, ...rest } = measure;
+          setForm(rest);
+          setBaselineForm(rest);
+          setManualOverrides(manual_overrides ?? []);
+        } else {
           const empty = createEmptyForm();
           setForm(empty);
           setBaselineForm(empty);
           setManualOverrides([]);
-          setSyncRestoredFields(new Set());
-        } else {
+        }
+        setSyncRestoredFields(new Set());
+      } catch (e) {
+        if (!opts?.silent) {
           setError(e instanceof ApiError ? e.message : "Chargement impossible.");
         }
-      })
-      .finally(() => setLoading(false));
-  }, [token, date]);
+      } finally {
+        if (!opts?.silent) setLoading(false);
+      }
+    },
+    [token, date],
+  );
+
+  useEffect(() => {
+    loadDay();
+  }, [loadDay]);
+
+  useEffect(() => {
+    if (!token || !isToday) return;
+
+    function onTodaySynced() {
+      loadDay({ silent: true });
+    }
+
+    window.addEventListener(HEALTH_TODAY_SYNCED_EVENT, onTodaySynced);
+    return () => window.removeEventListener(HEALTH_TODAY_SYNCED_EVENT, onTodaySynced);
+  }, [token, isToday, loadDay]);
 
   function setNum<K extends keyof MeasureFormValues>(key: K, raw: string) {
     const v = raw === "" ? null : Number(raw);
@@ -109,10 +140,12 @@ export function TodayPage() {
   }
 
   function fieldState(field: MeasureFieldName) {
+    if (!healthSyncActive) return "sync";
     return getFieldOverrideState(field, baselineForm, form, manualOverrides);
   }
 
   function fieldClass(field: MeasureFieldName) {
+    if (!healthSyncActive) return "";
     return overrideFieldClass(fieldState(field), syncRestoredFields.has(field));
   }
 
@@ -122,7 +155,7 @@ export function TodayPage() {
   }
 
   async function unlockFields(fields: MeasureFieldName[]) {
-    if (!token || fields.length === 0) return;
+    if (!token || !healthSyncActive || fields.length === 0) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -151,13 +184,15 @@ export function TodayPage() {
     setMessage(null);
     try {
       const dirty = detectDirtyMeasureFields(baselineForm, form);
-      const overrides = mergeManualOverrides(manualOverrides, dirty);
+      const overrides = healthSyncActive
+        ? mergeManualOverrides(manualOverrides, dirty)
+        : manualOverrides;
       const saved = await api.upsertMeasure(token, date, measureToPayload(form, overrides));
       const { id: _, date: __, manual_overrides, ...rest } = saved;
       setForm(rest);
       setBaselineForm(rest);
       setManualOverrides(manual_overrides ?? []);
-      if (dirty.length > 0) {
+      if (healthSyncActive && dirty.length > 0) {
         setMessage(
           `Mesure enregistrée pour le ${formatDateFR(date)}. ${formatFieldList(dirty)} en saisie manuelle (non écrasé par Health Connect).`,
         );
@@ -183,21 +218,27 @@ export function TodayPage() {
     <>
       <div className="card">
         <h2>{isToday ? "Aujourd'hui" : formatDateFR(date)}</h2>
-        <p className="card-intro card-intro--override">
-          Les champs en <span className="override-legend override-legend--manual">saisie manuelle</span> gardent
-          votre valeur ; Health Connect ne les écrase pas. Une{" "}
-          <span className="override-legend override-legend--pending">modification non enregistrée</span> sera
-          protégée après enregistrement.
-        </p>
+        {healthSyncActive ? (
+          <p className="card-intro card-intro--override">
+            Les champs en <span className="override-legend override-legend--manual">saisie manuelle</span>{" "}
+            gardent votre valeur ; Health Connect ne les écrase pas. Une{" "}
+            <span className="override-legend override-legend--pending">modification non enregistrée</span> sera
+            protégée après enregistrement.
+          </p>
+        ) : (
+          <p className="card-intro">Saisie rapide — les champs sont optionnels.</p>
+        )}
         {message && <div className="alert alert-success">{message}</div>}
         {error && <div className="alert alert-error">{error}</div>}
 
-        <ManualOverridesPanel
-          fields={lockedFields}
-          saving={saving}
-          onUnlockField={(field) => unlockFields([field])}
-          onUnlockAll={() => unlockFields(lockedFields)}
-        />
+        {healthSyncActive && (
+          <ManualOverridesPanel
+            fields={lockedFields}
+            saving={saving}
+            onUnlockField={(field) => unlockFields([field])}
+            onUnlockAll={() => unlockFields(lockedFields)}
+          />
+        )}
 
         <form className="form-grid form-grid--daily" onSubmit={onSubmit}>
           <section className="form-section">
@@ -220,14 +261,13 @@ export function TodayPage() {
 
           <section className="form-section">
             <label className={`field ${fieldClass("poids_kg")}`}>
-              <span className="field-label-row field-label-row--stacked">
-                <span>Poids (kg)</span>
-                <FieldOverrideStatus
-                  state={fieldState("poids_kg")}
-                  onResumeSync={resume("poids_kg")}
-                  disabled={saving}
-                />
-              </span>
+              <FieldLabelWithOverride
+                label="Poids (kg)"
+                showOverride={healthSyncActive}
+                state={fieldState("poids_kg")}
+                onResumeSync={resume("poids_kg")}
+                disabled={saving}
+              />
               <input
                 type="number"
                 inputMode="decimal"
@@ -240,14 +280,13 @@ export function TodayPage() {
 
             <div className="form-row form-row--3">
               <label className={`field ${fieldClass("masse_grasse_pct")}`}>
-                <span className="field-label-row field-label-row--stacked">
-                  <span>% masse grasse</span>
-                  <FieldOverrideStatus
-                    state={fieldState("masse_grasse_pct")}
-                    onResumeSync={resume("masse_grasse_pct")}
-                    disabled={saving}
-                  />
-                </span>
+                <FieldLabelWithOverride
+                  label="% masse grasse"
+                  showOverride={healthSyncActive}
+                  state={fieldState("masse_grasse_pct")}
+                  onResumeSync={resume("masse_grasse_pct")}
+                  disabled={saving}
+                />
                 <input
                   type="number"
                   inputMode="decimal"
@@ -257,14 +296,13 @@ export function TodayPage() {
                 />
               </label>
               <label className={`field ${fieldClass("tour_taille_cm")}`}>
-                <span className="field-label-row field-label-row--stacked">
-                  <span>Tour de taille (cm)</span>
-                  <FieldOverrideStatus
-                    state={fieldState("tour_taille_cm")}
-                    onResumeSync={resume("tour_taille_cm")}
-                    disabled={saving}
-                  />
-                </span>
+                <FieldLabelWithOverride
+                  label="Tour de taille (cm)"
+                  showOverride={healthSyncActive}
+                  state={fieldState("tour_taille_cm")}
+                  onResumeSync={resume("tour_taille_cm")}
+                  disabled={saving}
+                />
                 <input
                   type="number"
                   inputMode="decimal"
@@ -274,14 +312,13 @@ export function TodayPage() {
                 />
               </label>
               <label className={`field ${fieldClass("fc_repos_bpm")}`}>
-                <span className="field-label-row field-label-row--stacked">
-                  <span>FC repos (bpm)</span>
-                  <FieldOverrideStatus
-                    state={fieldState("fc_repos_bpm")}
-                    onResumeSync={resume("fc_repos_bpm")}
-                    disabled={saving}
-                  />
-                </span>
+                <FieldLabelWithOverride
+                  label="FC repos (bpm)"
+                  showOverride={healthSyncActive}
+                  state={fieldState("fc_repos_bpm")}
+                  onResumeSync={resume("fc_repos_bpm")}
+                  disabled={saving}
+                />
                 <input
                   type="number"
                   inputMode="numeric"
@@ -292,14 +329,13 @@ export function TodayPage() {
             </div>
 
             <label className={`field ${fieldClass("nb_pas")}`}>
-              <span className="field-label-row field-label-row--stacked">
-                <span>Nombre de pas</span>
-                <FieldOverrideStatus
-                  state={fieldState("nb_pas")}
-                  onResumeSync={resume("nb_pas")}
-                  disabled={saving}
-                />
-              </span>
+              <FieldLabelWithOverride
+                label="Nombre de pas"
+                showOverride={healthSyncActive}
+                state={fieldState("nb_pas")}
+                onResumeSync={resume("nb_pas")}
+                disabled={saving}
+              />
               <input
                 type="number"
                 inputMode="numeric"
@@ -316,14 +352,13 @@ export function TodayPage() {
           <section className="form-section">
             <div className="form-row form-row--2">
               <label className={`field ${fieldClass("tension_sys_mmhg")}`}>
-                <span className="field-label-row field-label-row--stacked">
-                  <span>Tension SYS (mmHg)</span>
-                  <FieldOverrideStatus
-                    state={fieldState("tension_sys_mmhg")}
-                    onResumeSync={resume("tension_sys_mmhg")}
-                    disabled={saving}
-                  />
-                </span>
+                <FieldLabelWithOverride
+                  label="Tension SYS (mmHg)"
+                  showOverride={healthSyncActive}
+                  state={fieldState("tension_sys_mmhg")}
+                  onResumeSync={resume("tension_sys_mmhg")}
+                  disabled={saving}
+                />
                 <input
                   type="number"
                   inputMode="numeric"
@@ -332,14 +367,13 @@ export function TodayPage() {
                 />
               </label>
               <label className={`field ${fieldClass("tension_dia_mmhg")}`}>
-                <span className="field-label-row field-label-row--stacked">
-                  <span>Tension DIA (mmHg)</span>
-                  <FieldOverrideStatus
-                    state={fieldState("tension_dia_mmhg")}
-                    onResumeSync={resume("tension_dia_mmhg")}
-                    disabled={saving}
-                  />
-                </span>
+                <FieldLabelWithOverride
+                  label="Tension DIA (mmHg)"
+                  showOverride={healthSyncActive}
+                  state={fieldState("tension_dia_mmhg")}
+                  onResumeSync={resume("tension_dia_mmhg")}
+                  disabled={saving}
+                />
                 <input
                   type="number"
                   inputMode="numeric"
@@ -354,6 +388,7 @@ export function TodayPage() {
             <SleepScaleInput
               label="Qualité du sommeil"
               value={form.sommeil}
+              showOverride={healthSyncActive}
               overrideState={fieldState("sommeil")}
               syncRestored={syncRestoredFields.has("sommeil")}
               onResumeSync={resume("sommeil")}
@@ -362,6 +397,7 @@ export function TodayPage() {
             />
             <TextScaleInput
               label="Niveau de stress"
+              showOverride={healthSyncActive}
               overrideState={fieldState("stress")}
               syncRestored={syncRestoredFields.has("stress")}
               onResumeSync={resume("stress")}
@@ -376,6 +412,7 @@ export function TodayPage() {
             />
             <TextScaleInput
               label="Niveau d'énergie"
+              showOverride={healthSyncActive}
               overrideState={fieldState("energie")}
               syncRestored={syncRestoredFields.has("energie")}
               onResumeSync={resume("energie")}
@@ -390,6 +427,7 @@ export function TodayPage() {
             />
             <TextScaleInput
               label="Niveau de faim"
+              showOverride={healthSyncActive}
               overrideState={fieldState("faim")}
               syncRestored={syncRestoredFields.has("faim")}
               onResumeSync={resume("faim")}
@@ -406,62 +444,73 @@ export function TodayPage() {
 
           <section className="form-section">
             <div className="checkbox-row">
-              <label className={fieldClass("entrainement")}>
+              <label className={healthSyncActive ? fieldClass("entrainement") : undefined}>
                 <input
                   type="checkbox"
                   checked={form.entrainement}
                   onChange={(e) => setForm((f) => ({ ...f, entrainement: e.target.checked }))}
                 />
-                <span className="checkbox-row__text">
-                  Entraînement
-                  <FieldOverrideStatus
-                    state={fieldState("entrainement")}
-                    onResumeSync={resume("entrainement")}
-                    disabled={saving}
-                  />
-                </span>
+                {healthSyncActive ? (
+                  <span className="checkbox-row__text">
+                    Entraînement
+                    <FieldOverrideStatus
+                      state={fieldState("entrainement")}
+                      onResumeSync={resume("entrainement")}
+                      disabled={saving}
+                    />
+                  </span>
+                ) : (
+                  "Entraînement"
+                )}
               </label>
-              <label className={fieldClass("alcool")}>
+              <label className={healthSyncActive ? fieldClass("alcool") : undefined}>
                 <input
                   type="checkbox"
                   checked={form.alcool}
                   onChange={(e) => setForm((f) => ({ ...f, alcool: e.target.checked }))}
                 />
-                <span className="checkbox-row__text">
-                  Alcool
-                  <FieldOverrideStatus
-                    state={fieldState("alcool")}
-                    onResumeSync={resume("alcool")}
-                    disabled={saving}
-                  />
-                </span>
+                {healthSyncActive ? (
+                  <span className="checkbox-row__text">
+                    Alcool
+                    <FieldOverrideStatus
+                      state={fieldState("alcool")}
+                      onResumeSync={resume("alcool")}
+                      disabled={saving}
+                    />
+                  </span>
+                ) : (
+                  "Alcool"
+                )}
               </label>
-              <label className={fieldClass("cheat_meal")}>
+              <label className={healthSyncActive ? fieldClass("cheat_meal") : undefined}>
                 <input
                   type="checkbox"
                   checked={form.cheat_meal}
                   onChange={(e) => setForm((f) => ({ ...f, cheat_meal: e.target.checked }))}
                 />
-                <span className="checkbox-row__text">
-                  Repas plaisir
-                  <FieldOverrideStatus
-                    state={fieldState("cheat_meal")}
-                    onResumeSync={resume("cheat_meal")}
-                    disabled={saving}
-                  />
-                </span>
+                {healthSyncActive ? (
+                  <span className="checkbox-row__text">
+                    Repas plaisir
+                    <FieldOverrideStatus
+                      state={fieldState("cheat_meal")}
+                      onResumeSync={resume("cheat_meal")}
+                      disabled={saving}
+                    />
+                  </span>
+                ) : (
+                  "Repas plaisir"
+                )}
               </label>
             </div>
 
             <label className={`field ${fieldClass("notes")}`}>
-              <span className="field-label-row field-label-row--stacked">
-                <span>Notes</span>
-                <FieldOverrideStatus
-                  state={fieldState("notes")}
-                  onResumeSync={resume("notes")}
-                  disabled={saving}
-                />
-              </span>
+              <FieldLabelWithOverride
+                label="Notes"
+                showOverride={healthSyncActive}
+                state={fieldState("notes")}
+                onResumeSync={resume("notes")}
+                disabled={saving}
+              />
               <textarea
                 rows={3}
                 maxLength={2000}

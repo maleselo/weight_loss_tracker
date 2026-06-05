@@ -1,10 +1,13 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { AppVersion } from "./AppVersion";
 import { useAuth } from "../context/AuthContext";
+import { useTodayHealthSyncOnOpen } from "../hooks/useTodayHealthSyncOnOpen";
 
 export function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigate = useNavigate();
+
+  useTodayHealthSyncOnOpen(token);
 
   return (
     <div className="app-shell">

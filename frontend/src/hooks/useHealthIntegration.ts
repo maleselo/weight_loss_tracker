@@ -152,22 +152,3 @@ export function useHealthIntegration(token: string | null) {
   };
 }
 
-/** Sync silencieuse au démarrage si déjà connecté (app native uniquement). */
-export function useAutoHealthSync(token: string | null, connected: boolean | undefined) {
-  useEffect(() => {
-    if (!token || !connected || !isNativeHealthAvailable()) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const records = await readPlatformHealthData(getStoredHealthSyncDays());
-        if (cancelled || records.length === 0) return;
-        await api.syncHealthConnect(token, records);
-      } catch {
-        /* silencieux */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, connected]);
-}

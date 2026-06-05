@@ -16,6 +16,7 @@ interface Props {
   syncRestored?: boolean;
   onResumeSync?: () => void;
   resumeDisabled?: boolean;
+  showOverride?: boolean;
 }
 
 export function TextScaleInput({
@@ -27,17 +28,25 @@ export function TextScaleInput({
   syncRestored = false,
   onResumeSync,
   resumeDisabled,
+  showOverride = true,
 }: Props) {
+  const state = showOverride ? overrideState : "sync";
+  const fieldClass = showOverride ? overrideFieldClass(overrideState, syncRestored) : "";
+
   return (
-    <div className={`field scale-field ${overrideFieldClass(overrideState, syncRestored)}`}>
-      <span className="field-label-row field-label-row--stacked">
-        <span>{label}</span>
-        <FieldOverrideStatus
-          state={overrideState}
-          onResumeSync={onResumeSync}
-          disabled={resumeDisabled}
-        />
-      </span>
+    <div className={`field scale-field ${fieldClass}`.trim()}>
+      {showOverride ? (
+        <span className="field-label-row field-label-row--stacked">
+          <span>{label}</span>
+          <FieldOverrideStatus
+            state={state}
+            onResumeSync={onResumeSync}
+            disabled={resumeDisabled}
+          />
+        </span>
+      ) : (
+        <span className="field-label-row">{label}</span>
+      )}
       <div className="scale-buttons scale-buttons--text" role="group" aria-label={label}>
         {options.map((opt) => (
           <button

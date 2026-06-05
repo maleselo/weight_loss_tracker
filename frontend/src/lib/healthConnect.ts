@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { todayISO } from "./dates";
 import { computeSleepQualityScore } from "./sleepScore";
 import {
   computeEnergyLevel,
@@ -432,6 +433,15 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
     )
     .sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/** Données Health Connect pour la journée en cours (lit 7 j. pour le calcul stress/énergie). */
+export async function readTodayHealthRecords(): Promise<LocalSyncRecord[]> {
+  const today = todayISO();
+  const records = await readPlatformHealthData(7);
+  return records.filter((record) => record.date === today);
+}
+
+export const HEALTH_TODAY_SYNCED_EVENT = "health-today-synced";
 
 /** @deprecated Utiliser readPlatformHealthData */
 export const readHealthConnectData = readPlatformHealthData;

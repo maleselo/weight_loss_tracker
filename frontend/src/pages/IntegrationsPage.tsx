@@ -1,7 +1,7 @@
 import { HealthProviderGuideList, NativePlatformHint } from "../components/HealthProviderGuide";
 import { MobileAppRequiredBanner } from "../components/MobileAppRequiredBanner";
 import { useAuth } from "../context/AuthContext";
-import { useAutoHealthSync, useHealthIntegration } from "../hooks/useHealthIntegration";
+import { useHealthIntegration } from "../hooks/useHealthIntegration";
 import { nativePlatformLabel } from "../lib/healthConnect";
 import { HEALTH_SYNC_PERIOD_OPTIONS } from "../lib/healthSyncPeriod";
 
@@ -20,8 +20,6 @@ export function IntegrationsPage() {
     setSyncDays,
     isNative,
   } = useHealthIntegration(token);
-
-  useAutoHealthSync(token, status?.connected);
 
   if (loading) return <p className="empty">Chargement…</p>;
 

@@ -680,6 +680,42 @@ label.field textarea:focus {
   cursor: not-allowed;
 }
 
+.android-install-card {
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+  border: 1px solid #99f6e4;
+}
+
+.android-install-card strong {
+  display: block;
+  color: var(--teal-900);
+  margin-bottom: 0.35rem;
+}
+
+.android-install-card p {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--slate-700);
+}
+
+.android-install-btn {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+}
+
+.android-install-note {
+  margin-top: 0.65rem !important;
+  margin-bottom: 0 !important;
+}
+
+.integration-browser-note .android-install-btn {
+  margin-top: 0.75rem;
+}
+
 .integration-steps {
   margin-bottom: 1.25rem;
   padding-bottom: 1rem;

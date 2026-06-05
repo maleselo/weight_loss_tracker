@@ -16,7 +16,6 @@ export function IntegrationsPage() {
     syncNow,
     disconnect,
     isNative,
-    syncContext,
   } = useHealthIntegration(token);
 
   useAutoHealthSync(token, status?.connected);
@@ -30,9 +29,8 @@ export function IntegrationsPage() {
       <div className="card">
         <h2>Connexions santé</h2>
         <p className="card-intro">
-          Reliez <strong>n&apos;importe quelle app santé</strong> (Samsung Health, Apple Health,
-          Fitbit, Garmin, Oura, Withings…) à votre tableau de bord. Sur Android tout passe par{" "}
-          <strong>Health Connect</strong> ; sur iPhone par <strong>Apple Health</strong>.
+          Reliez <strong>n&apos;importe quelle app santé Android</strong> (Samsung Health, Fitbit,
+          Garmin, Oura, Withings…) à votre tableau de bord via <strong>Health Connect</strong>.
         </p>
 
         <NativePlatformHint />
@@ -46,13 +44,13 @@ export function IntegrationsPage() {
           <div className="integration-status__row">
             <span className="integration-status__dot" aria-hidden />
             <div>
-              <strong>Hub santé — {isNative ? nativePlatformLabel() : "application native requise"}</strong>
+              <strong>Health Connect — {isNative ? nativePlatformLabel() : "application Android requise"}</strong>
               <p className="sub">
                 {status?.connected
                   ? `Connecté${status.last_sync_at ? ` — dernière sync ${formatWhen(status.last_sync_at)}` : ""}`
                   : canSync
                     ? "Non connecté — configurez votre app santé ci-dessous, puis connectez-vous"
-                    : "Installez l'application native pour activer la synchronisation"}
+                    : "Installez l'application Android pour activer la synchronisation"}
               </p>
               {status?.last_sync_message && <p className="sub">{status.last_sync_message}</p>}
             </div>
@@ -70,7 +68,7 @@ export function IntegrationsPage() {
                 onClick={connectAndSync}
                 title={
                   !canSync
-                    ? "Installez l'application native — le navigateur ne peut pas accéder à Health Connect"
+                    ? "Installez l'application Android — le navigateur ne peut pas accéder à Health Connect"
                     : undefined
                 }
               >
@@ -104,22 +102,12 @@ export function IntegrationsPage() {
           <p className="sub integration-hint">
             Import automatique : pas, poids, fréquence cardiaque (selon ce que vos apps partagent).
             Sommeil, stress et notes : saisie manuelle dans l&apos;onglet Aujourd&apos;hui.
-            {syncContext === "native-ios" && " Sur iPhone, autorisez Apple Health lors de la connexion."}
           </p>
         </section>
       </div>
 
       <div className="card">
-        <HealthProviderGuideList
-          defaultFilter={
-            syncContext === "native-ios" || (syncContext === "mobile-browser" && /iPhone/i.test(navigator.userAgent))
-              ? "ios"
-              : syncContext === "native-android" ||
-                  (syncContext === "mobile-browser" && /Android/i.test(navigator.userAgent))
-                ? "android"
-                : "all"
-          }
-        />
+        <HealthProviderGuideList />
       </div>
     </>
   );

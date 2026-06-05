@@ -92,3 +92,20 @@ Terminal 2 — interface :
 cd frontend && npm run dev
 ```
 
+### Application Android (sync Health Connect)
+
+La synchronisation Samsung Health / Fitbit / Garmin ne fonctionne **pas** dans le navigateur mobile — installez l’APK native.
+
+**Téléchargement** : [dernière release GitHub](https://github.com/maleselo/weight_loss_tracker/releases/latest/download/tableau-de-bord-sante.apk) (bouton aussi sur le tableau de bord web).
+
+**Build local** :
+```bash
+cd frontend
+VITE_API_URL=https://votre-api.railway.app npm run build
+npx cap sync android
+cd android && ./gradlew assembleDebug
+# APK : android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Release CI** : workflow `.github/workflows/android-release.yml` (tag `app-v*` ou lancement manuel). Définir la variable de dépôt `VITE_API_URL` (URL de l’API Railway).
+

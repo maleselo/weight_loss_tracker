@@ -19,10 +19,6 @@ function nativeRequiredHint(): string {
 }
 
 function emptyDataHint(): string {
-  const ctx = getHealthSyncContext();
-  if (ctx === "native-ios") {
-    return "Aucune donnée trouvée. Vérifiez que vos apps (Apple Watch, Fitbit, Oura…) partagent vers Apple Health, puis Réglages → Santé → Données d'accès.";
-  }
   return "Aucune donnée trouvée. Configurez d'abord votre app santé vers Health Connect (voir les guides ci-dessous), puis réessayez.";
 }
 

@@ -46,7 +46,6 @@ export function isNativeHealthAvailable(): boolean {
 export function nativePlatformLabel(): string {
   const ctx = getHealthSyncContext();
   if (ctx === "native-android") return "Android (Health Connect)";
-  if (ctx === "native-ios") return "iPhone (Apple Health)";
   if (ctx === "mobile-browser") return "navigateur mobile (non compatible)";
   return "navigateur ordinateur";
 }

@@ -6,3 +6,11 @@ frontend/.env
 *.py[cod]
 node_modules/
 dist/
+.android-sdk/
+.jdk21/
+
+# Android build outputs
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/local.properties

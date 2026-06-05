@@ -1,10 +1,15 @@
-import { FieldLockHint } from "./FieldLockHint";
+import { FieldOverrideStatus } from "./FieldOverrideStatus";
+import type { FieldOverrideState } from "../lib/measureFields";
+import { overrideFieldClass } from "../lib/measureFields";
 
 interface Props {
   label: string;
   value: number | null;
   onChange: (v: number | null) => void;
-  userLocked?: boolean;
+  overrideState?: FieldOverrideState;
+  syncRestored?: boolean;
+  onResumeSync?: () => void;
+  resumeDisabled?: boolean;
 }
 
 const OPTIONS = [
@@ -13,12 +18,24 @@ const OPTIONS = [
   { value: 3, emoji: "😊", title: "Bon" },
 ] as const;
 
-export function SleepScaleInput({ label, value, onChange, userLocked }: Props) {
+export function SleepScaleInput({
+  label,
+  value,
+  onChange,
+  overrideState = "sync",
+  syncRestored = false,
+  onResumeSync,
+  resumeDisabled,
+}: Props) {
   return (
-    <div className="field scale-field">
-      <span className="field-label-row">
-        {label}
-        <FieldLockHint locked={userLocked} />
+    <div className={`field scale-field ${overrideFieldClass(overrideState, syncRestored)}`}>
+      <span className="field-label-row field-label-row--stacked">
+        <span>{label}</span>
+        <FieldOverrideStatus
+          state={overrideState}
+          onResumeSync={onResumeSync}
+          disabled={resumeDisabled}
+        />
       </span>
       <div className="scale-buttons scale-buttons--emoji" role="group" aria-label={label}>
         {OPTIONS.map((opt) => (

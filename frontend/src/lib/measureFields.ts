@@ -22,6 +22,8 @@ export const MEASURE_FIELD_NAMES: MeasureFieldName[] = [
 
 export type MeasureFormValues = Pick<DailyMeasurement, MeasureFieldName>;
 
+export type FieldOverrideState = "sync" | "pending" | "manual";
+
 function valuesEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   const empty = (v: unknown) => v === null || v === undefined || v === "";
@@ -44,4 +46,23 @@ export function detectDirtyMeasureFields(
 
 export function mergeManualOverrides(existing: string[], dirty: MeasureFieldName[]): string[] {
   return [...new Set([...existing, ...dirty])].sort();
+}
+
+export function getFieldOverrideState(
+  field: MeasureFieldName,
+  baseline: MeasureFormValues,
+  current: MeasureFormValues,
+  manualOverrides: string[],
+): FieldOverrideState {
+  if (manualOverrides.includes(field)) return "manual";
+  if (!valuesEqual(baseline[field], current[field])) return "pending";
+  return "sync";
+}
+
+export function overrideFieldClass(state: FieldOverrideState, syncRestored = false): string {
+  const classes: string[] = [];
+  if (state === "manual") classes.push("field--override-manual");
+  if (state === "pending") classes.push("field--override-pending");
+  if (syncRestored) classes.push("field--sync-restored");
+  return classes.join(" ");
 }

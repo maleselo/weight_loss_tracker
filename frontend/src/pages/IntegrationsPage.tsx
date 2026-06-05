@@ -3,6 +3,7 @@ import { MobileAppRequiredBanner } from "../components/MobileAppRequiredBanner";
 import { useAuth } from "../context/AuthContext";
 import { useAutoHealthSync, useHealthIntegration } from "../hooks/useHealthIntegration";
 import { nativePlatformLabel } from "../lib/healthConnect";
+import { HEALTH_SYNC_PERIOD_OPTIONS } from "../lib/healthSyncPeriod";
 
 export function IntegrationsPage() {
   const { token } = useAuth();
@@ -15,6 +16,8 @@ export function IntegrationsPage() {
     connectAndSync,
     syncNow,
     disconnect,
+    syncDays,
+    setSyncDays,
     isNative,
   } = useHealthIntegration(token);
 
@@ -59,6 +62,22 @@ export function IntegrationsPage() {
 
         <section className="integration-steps">
           <h3>Connecter le tableau de bord</h3>
+          <div className="integration-sync-period">
+            <p className="sub">Période à importer depuis Health Connect</p>
+            <div className="preset-row">
+              {HEALTH_SYNC_PERIOD_OPTIONS.map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  className={`btn-preset ${syncDays === days ? "btn-preset--active" : ""}`}
+                  disabled={syncing}
+                  onClick={() => setSyncDays(days)}
+                >
+                  {days} jours
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="integration-actions">
             {!status?.connected ? (
               <button
@@ -102,6 +121,7 @@ export function IntegrationsPage() {
           <p className="sub integration-hint">
             Import automatique : pas, poids, masse grasse (%), FC (repos ou min. journalière),
             tension (selon ce que vos apps partagent via Health Connect).
+            Choisissez une période courte si vos données récentes sont incomplètes.
             Sommeil, stress et notes : saisie manuelle dans l&apos;onglet Aujourd&apos;hui.
           </p>
         </section>

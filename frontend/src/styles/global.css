@@ -816,6 +816,14 @@ label.field textarea:focus {
   word-break: break-all;
 }
 
+.integration-sync-period {
+  margin-bottom: 1rem;
+}
+
+.integration-sync-period .sub {
+  margin-bottom: 0.5rem;
+}
+
 .integration-actions {
   display: grid;
   gap: 0.65rem;

@@ -159,7 +159,7 @@ async function readSamplesSafe(
 }
 
 /** Lit Health Connect (Android) — hub unique après config des apps sources. */
-export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord[]> {
+export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[]> {
   if (!isNativeHealthAvailable()) {
     throw new Error("NATIVE_REQUIRED");
   }

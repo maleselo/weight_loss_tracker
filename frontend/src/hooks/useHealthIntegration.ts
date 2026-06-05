@@ -6,6 +6,11 @@ import {
   readPlatformHealthData,
   summarizeHealthRecords,
 } from "../lib/healthConnect";
+import {
+  getStoredHealthSyncDays,
+  storeHealthSyncDays,
+  type HealthSyncPeriodDays,
+} from "../lib/healthSyncPeriod";
 import type { IntegrationStatus } from "../types";
 
 function nativeRequiredHint(): string {
@@ -29,6 +34,12 @@ export function useHealthIntegration(token: string | null) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [syncDays, setSyncDaysState] = useState<HealthSyncPeriodDays>(getStoredHealthSyncDays);
+
+  const setSyncDays = useCallback((days: HealthSyncPeriodDays) => {
+    setSyncDaysState(days);
+    storeHealthSyncDays(days);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -57,14 +68,14 @@ export function useHealthIntegration(token: string | null) {
         setError(nativeRequiredHint());
         return;
       }
-      const records = await readPlatformHealthData(30);
+      const records = await readPlatformHealthData(syncDays);
       if (records.length === 0) {
         setError(emptyDataHint());
         return;
       }
       await api.connectHealthConnect(token);
       const result = await api.syncHealthConnect(token, records);
-      setMessage(`${result.message} (${summarizeHealthRecords(records)})`);
+      setMessage(`${result.message} — ${syncDays} j. : ${summarizeHealthRecords(records)}`);
       await refresh();
     } catch (err) {
       if (err instanceof Error && err.message === "NATIVE_REQUIRED") {
@@ -79,7 +90,7 @@ export function useHealthIntegration(token: string | null) {
     } finally {
       setSyncing(false);
     }
-  }, [token, refresh]);
+  }, [token, refresh, syncDays]);
 
   const syncNow = useCallback(async () => {
     if (!token) return;
@@ -91,13 +102,13 @@ export function useHealthIntegration(token: string | null) {
         setError(nativeRequiredHint());
         return;
       }
-      const records = await readPlatformHealthData(30);
+      const records = await readPlatformHealthData(syncDays);
       if (records.length === 0) {
         setError(emptyDataHint());
         return;
       }
       const result = await api.syncHealthConnect(token, records);
-      setMessage(`${result.message} (${summarizeHealthRecords(records)})`);
+      setMessage(`${result.message} — ${syncDays} j. : ${summarizeHealthRecords(records)}`);
       await refresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -106,7 +117,7 @@ export function useHealthIntegration(token: string | null) {
     } finally {
       setSyncing(false);
     }
-  }, [token, refresh]);
+  }, [token, refresh, syncDays]);
 
   const disconnect = useCallback(async () => {
     if (!token) return;
@@ -134,6 +145,8 @@ export function useHealthIntegration(token: string | null) {
     connectAndSync,
     syncNow,
     disconnect,
+    syncDays,
+    setSyncDays,
     isNative: isNativeHealthAvailable(),
     syncContext: getHealthSyncContext(),
   };
@@ -146,7 +159,7 @@ export function useAutoHealthSync(token: string | null, connected: boolean | und
     let cancelled = false;
     (async () => {
       try {
-        const records = await readPlatformHealthData(7);
+        const records = await readPlatformHealthData(getStoredHealthSyncDays());
         if (cancelled || records.length === 0) return;
         await api.syncHealthConnect(token, records);
       } catch {

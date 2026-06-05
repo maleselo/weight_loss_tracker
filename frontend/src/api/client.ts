@@ -1,4 +1,13 @@
-import type { DailyMeasurement, DashboardSummary, SeriesOut, User, UserUpdate } from "../types";
+import type {
+  DailyMeasurement,
+  DashboardSummary,
+  HealthSyncRecordInput,
+  IntegrationStatus,
+  IntegrationSyncResult,
+  SeriesOut,
+  User,
+  UserUpdate,
+} from "../types";
 
 function getApiBase(): string {
   const runtime = window.__API_URL__?.trim().replace(/\/$/, "");
@@ -186,6 +195,28 @@ export const api = {
     a.remove();
     URL.revokeObjectURL(url);
   },
+
+  integrationStatus: (token: string) =>
+    request<IntegrationStatus>("/api/integrations/status", { token }),
+
+  connectHealthConnect: (token: string) =>
+    request<IntegrationStatus>("/api/integrations/health-connect/connect", {
+      method: "POST",
+      token,
+    }),
+
+  disconnectHealthConnect: (token: string) =>
+    request<IntegrationStatus>("/api/integrations/health-connect", {
+      method: "DELETE",
+      token,
+    }),
+
+  syncHealthConnect: (token: string, records: HealthSyncRecordInput[]) =>
+    request<IntegrationSyncResult>("/api/integrations/health-connect/sync", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ records }),
+    }),
 };
 
 export { ApiError };

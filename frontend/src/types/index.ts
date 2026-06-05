@@ -60,4 +60,31 @@ export interface SeriesOut {
   points: SeriesPoint[];
 }
 
+export interface IntegrationStatus {
+  provider: string;
+  connected: boolean;
+  connected_at: string | null;
+  last_sync_at: string | null;
+  last_sync_status: string | null;
+  last_sync_message: string | null;
+  auto_sync: boolean;
+  native_app_required: boolean;
+}
+
+export interface IntegrationSyncResult {
+  synced_days: number;
+  last_sync_at: string;
+  message: string;
+}
+
+export interface HealthSyncRecordInput {
+  date: string;
+  weight?: number;
+  body_fat_percentage?: number;
+  resting_heart_rate?: number;
+  step_count?: number;
+  blood_pressure_sys?: number;
+  blood_pressure_dia?: number;
+}
+
 export type MeasurementForm = Omit<DailyMeasurement, "id" | "date">;

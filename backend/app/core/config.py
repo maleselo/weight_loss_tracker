@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # URLs frontend autorisées (séparées par des virgules)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # Sync externe (Tasker, Samsung Health bridge) — laisser vide pour désactiver
+    health_sync_token: str = ""
+    health_sync_user_email: str = ""
+
     @field_validator("database_url", mode="before")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:

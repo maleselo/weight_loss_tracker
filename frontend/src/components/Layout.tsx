@@ -40,6 +40,10 @@ export function Layout() {
             <span>☰</span>
             Historique
           </NavLink>
+          <NavLink to="/connexions" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+            <span>🔗</span>
+            Connexions
+          </NavLink>
           <NavLink to="/export" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
             <span>📄</span>
             Export

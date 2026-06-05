@@ -15,3 +15,4 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Europe/Paris")
 
     measurements = relationship("DailyMeasurement", back_populates="user")
+    health_connections = relationship("HealthConnection", back_populates="user")

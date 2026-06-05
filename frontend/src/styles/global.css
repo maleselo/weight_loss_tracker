@@ -101,17 +101,18 @@ textarea {
 
 .nav-link {
   flex: 1;
+  min-width: 0;
   text-align: center;
   text-decoration: none;
   color: var(--slate-600);
-  font-size: 0.75rem;
-  padding: 0.35rem 0.25rem;
+  font-size: 0.68rem;
+  padding: 0.35rem 0.15rem;
   border-radius: 8px;
 }
 
 .nav-link span {
   display: block;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   line-height: 1.2;
 }
 
@@ -569,4 +570,230 @@ label.field textarea:focus {
 
 .scale-emoji {
   display: block;
+}
+
+.integration-status {
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: var(--white);
+}
+
+.integration-status--on {
+  border-color: var(--teal-600);
+  background: var(--teal-50);
+}
+
+.integration-status__row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.integration-status__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 0.35rem;
+  background: var(--slate-400);
+  flex-shrink: 0;
+}
+
+.integration-status--on .integration-status__dot {
+  background: #16a34a;
+}
+
+.integration-browser-note {
+  background: #fffbeb;
+  color: var(--slate-900);
+  border: 1px solid #fcd34d;
+}
+
+.integration-browser-note p {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+}
+
+.integration-steps {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.integration-steps:last-of-type {
+  border-bottom: none;
+}
+
+.integration-steps h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--teal-900);
+}
+
+.integration-steps ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--slate-600);
+  font-size: 0.88rem;
+}
+
+.integration-steps li {
+  margin-bottom: 0.35rem;
+}
+
+.integration-steps code {
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+
+.integration-actions {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.integration-hint {
+  margin: 0;
+}
+
+.integration-bridge-diagram {
+  background: var(--teal-50);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+  color: var(--slate-600);
+}
+
+.integration-bridge-diagram p {
+  margin: 0 0 0.5rem;
+  color: var(--teal-900);
+}
+
+.integration-bridge-diagram ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.integration-bridge-diagram li {
+  margin-bottom: 0.35rem;
+}
+
+.provider-guide__header h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: var(--teal-900);
+}
+
+.provider-filter-row {
+  margin-bottom: 0;
+}
+
+.provider-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.provider-card {
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--white);
+}
+
+.provider-card__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--slate-900);
+}
+
+.provider-card__toggle:hover {
+  background: var(--teal-50);
+}
+
+.provider-card__icon {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.provider-card__title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.provider-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.provider-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--slate-200);
+  color: var(--slate-600);
+}
+
+.provider-card__chevron {
+  color: var(--slate-600);
+  flex-shrink: 0;
+}
+
+.provider-card__body {
+  padding: 0 0.85rem 0.85rem;
+  border-top: 1px solid var(--slate-200);
+}
+
+.provider-card__data {
+  margin: 0.65rem 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--slate-600);
+}
+
+.provider-card__note {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  color: var(--slate-600);
+  font-style: italic;
+}
+
+.provider-procedure {
+  margin-top: 0.65rem;
+}
+
+.provider-procedure h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--teal-800);
+}
+
+.provider-procedure ol {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.84rem;
+  color: var(--slate-600);
+}
+
+.provider-procedure li {
+  margin-bottom: 0.3rem;
 }

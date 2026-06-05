@@ -7,6 +7,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ExportPage } from "./pages/ExportPage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { TodayPage } from "./pages/TodayPage";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -33,6 +34,7 @@ export default function App() {
             <Route index element={<TodayPage />} />
             <Route path="tableau-de-bord" element={<DashboardPage />} />
             <Route path="historique" element={<HistoryPage />} />
+            <Route path="connexions" element={<IntegrationsPage />} />
             <Route path="export" element={<ExportPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

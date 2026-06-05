@@ -19,8 +19,15 @@ export type HealthSyncContext =
   | "mobile-browser"
   | "desktop-browser";
 
-const HEALTH_READ_TYPES = ["steps", "weight", "heartRate"] as const;
+const HEALTH_READ_TYPES = ["steps", "weight", "restingHeartRate", "bodyFat"] as const;
 type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
+
+const PERMISSION_LABELS: Record<string, string> = {
+  steps: "pas",
+  weight: "poids",
+  restingHeartRate: "fréquence cardiaque au repos",
+  bodyFat: "masse grasse (%)",
+};
 
 export function isMobileBrowser(): boolean {
   if (Capacitor.isNativePlatform()) return false;
@@ -71,16 +78,34 @@ function ensureDay(map: Map<string, LocalSyncRecord>, date: string): LocalSyncRe
 }
 
 function permissionDeniedMessage(denied: string[]): string {
-  const labels: Record<string, string> = {
-    steps: "pas",
-    weight: "poids",
-    heartRate: "fréquence cardiaque",
-  };
-  const list = denied.map((d) => labels[d] ?? d).join(", ");
+  const list = denied.map((d) => PERMISSION_LABELS[d] ?? d).join(", ");
   return `Autorisation refusée pour : ${list}. Ouvrez Health Connect → Autorisations des applications → Tableau de bord santé, puis activez la lecture.`;
 }
 
-/** Lit Health Connect (Android) ou HealthKit (iOS) — hub unique après config des apps sources. */
+async function readSamplesSafe(
+  Health: Awaited<typeof import("@capgo/capacitor-health")>["Health"],
+  dataType: HealthReadType,
+  startIso: string,
+  endIso: string,
+  limit: number,
+) {
+  try {
+    return await Health.readSamples({
+      dataType,
+      startDate: startIso,
+      endDate: endIso,
+      limit,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/SecurityException|permission/i.test(msg)) {
+      throw new Error(permissionDeniedMessage([dataType]));
+    }
+    throw err;
+  }
+}
+
+/** Lit Health Connect (Android) — hub unique après config des apps sources. */
 export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord[]> {
   if (!isNativeHealthAvailable()) {
     throw new Error("NATIVE_REQUIRED");
@@ -109,7 +134,7 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
     throw new Error(
       readDenied.length > 0
         ? permissionDeniedMessage(readDenied)
-        : "Aucune autorisation Health Connect accordée. Réessayez et acceptez au moins pas, poids ou fréquence cardiaque.",
+        : "Aucune autorisation Health Connect accordée. Réessayez et acceptez au moins pas, poids, FC repos ou masse grasse.",
     );
   }
 
@@ -120,77 +145,59 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
   const endIso = end.toISOString();
 
   const byDate = new Map<string, LocalSyncRecord>();
+  const restingHrByDay = new Map<string, number[]>();
 
   if (readAuthorized.has("steps")) {
-    try {
-      const stepsResult = await Health.readSamples({
-        dataType: "steps",
-        startDate: startIso,
-        endDate: endIso,
-        limit: 5000,
-      });
-      for (const sample of stepsResult.samples ?? []) {
-        const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-        const row = ensureDay(byDate, key);
-        row.step_count = (row.step_count ?? 0) + (sample.value ?? 0);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/SecurityException|permission/i.test(msg)) {
-        throw new Error(permissionDeniedMessage(["steps"]));
-      }
-      throw err;
+    const stepsResult = await readSamplesSafe(Health, "steps", startIso, endIso, 5000);
+    for (const sample of stepsResult.samples ?? []) {
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const row = ensureDay(byDate, key);
+      row.step_count = (row.step_count ?? 0) + (sample.value ?? 0);
     }
   }
 
   if (readAuthorized.has("weight")) {
-    try {
-      const weightResult = await Health.readSamples({
-        dataType: "weight",
-        startDate: startIso,
-        endDate: endIso,
-        limit: 500,
-      });
-      for (const sample of weightResult.samples ?? []) {
-        const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-        const row = ensureDay(byDate, key);
-        row.weight = sample.value ?? row.weight;
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/SecurityException|permission/i.test(msg)) {
-        throw new Error(permissionDeniedMessage(["weight"]));
-      }
-      throw err;
+    const weightResult = await readSamplesSafe(Health, "weight", startIso, endIso, 500);
+    for (const sample of weightResult.samples ?? []) {
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const row = ensureDay(byDate, key);
+      row.weight = sample.value ?? row.weight;
     }
   }
 
-  if (readAuthorized.has("heartRate")) {
-    try {
-      const hrResult = await Health.readSamples({
-        dataType: "heartRate",
-        startDate: startIso,
-        endDate: endIso,
-        limit: 500,
-      });
-      for (const sample of hrResult.samples ?? []) {
-        const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-        const row = ensureDay(byDate, key);
-        if (row.resting_heart_rate == null) {
-          row.resting_heart_rate = Math.round(sample.value ?? 0);
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/SecurityException|permission/i.test(msg)) {
-        throw new Error(permissionDeniedMessage(["heartRate"]));
-      }
-      throw err;
+  if (readAuthorized.has("bodyFat")) {
+    const bfResult = await readSamplesSafe(Health, "bodyFat", startIso, endIso, 500);
+    for (const sample of bfResult.samples ?? []) {
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const row = ensureDay(byDate, key);
+      // Health Connect : percent (0–100)
+      row.body_fat_percentage = sample.value ?? row.body_fat_percentage;
+    }
+  }
+
+  if (readAuthorized.has("restingHeartRate")) {
+    const hrResult = await readSamplesSafe(Health, "restingHeartRate", startIso, endIso, 500);
+    for (const sample of hrResult.samples ?? []) {
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const values = restingHrByDay.get(key) ?? [];
+      values.push(sample.value ?? 0);
+      restingHrByDay.set(key, values);
+    }
+    for (const [key, values] of restingHrByDay) {
+      const row = ensureDay(byDate, key);
+      const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+      row.resting_heart_rate = Math.round(avg);
     }
   }
 
   return [...byDate.values()]
-    .filter((r) => r.step_count != null || r.weight != null || r.resting_heart_rate != null)
+    .filter(
+      (r) =>
+        r.step_count != null ||
+        r.weight != null ||
+        r.body_fat_percentage != null ||
+        r.resting_heart_rate != null,
+    )
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 

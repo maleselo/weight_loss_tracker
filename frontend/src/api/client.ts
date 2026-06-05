@@ -133,6 +133,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  deleteMeasure: (token: string, date: string) =>
+    request<void>(`/api/measures/${date}`, { method: "DELETE", token }),
+
   listMeasures: (token: string, start?: string, end?: string) => {
     const params = new URLSearchParams();
     if (start) params.set("start", start);

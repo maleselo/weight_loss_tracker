@@ -107,5 +107,20 @@ cd android && ./gradlew assembleDebug
 # APK : android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-**Release CI** : workflow `.github/workflows/android-release.yml` (tag `app-v*` ou lancement manuel). Définir la variable de dépôt `VITE_API_URL` (URL de l’API Railway).
+**Publier une release** (recommandé) :
+```bash
+# 1. Tag sur le commit à publier (si pas déjà fait)
+git tag -a app-v1.0.5 -m "Description de la release"
+git push origin app-v1.0.5
+
+# 2. Build APK
+cd frontend
+VITE_API_URL=https://votre-api.railway.app npm run android:build
+
+# 3. Publier sur GitHub Releases (gh auth login ou GITHUB_TOKEN requis)
+cd ..
+./scripts/publish-android-release.sh app-v1.0.5
+```
+
+**Release CI** (alternative) : workflow `.github/workflows/android-release.yml` (tag `app-v*` ou lancement manuel). Définir la variable de dépôt `VITE_API_URL` (URL de l’API Railway).
 

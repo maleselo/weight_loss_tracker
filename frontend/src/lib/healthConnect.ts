@@ -19,6 +19,9 @@ export type HealthSyncContext =
   | "mobile-browser"
   | "desktop-browser";
 
+const HEALTH_READ_TYPES = ["steps", "weight", "heartRate"] as const;
+type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
+
 export function isMobileBrowser(): boolean {
   if (Capacitor.isNativePlatform()) return false;
   if (typeof navigator === "undefined") return false;
@@ -67,6 +70,16 @@ function ensureDay(map: Map<string, LocalSyncRecord>, date: string): LocalSyncRe
   return row;
 }
 
+function permissionDeniedMessage(denied: string[]): string {
+  const labels: Record<string, string> = {
+    steps: "pas",
+    weight: "poids",
+    heartRate: "fréquence cardiaque",
+  };
+  const list = denied.map((d) => labels[d] ?? d).join(", ");
+  return `Autorisation refusée pour : ${list}. Ouvrez Health Connect → Autorisations des applications → Tableau de bord santé, puis activez la lecture.`;
+}
+
 /** Lit Health Connect (Android) ou HealthKit (iOS) — hub unique après config des apps sources. */
 export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord[]> {
   if (!isNativeHealthAvailable()) {
@@ -85,9 +98,20 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
     );
   }
 
-  await Health.requestAuthorization({
-    read: ["steps", "weight", "heartRate"],
+  const auth = await Health.requestAuthorization({
+    read: [...HEALTH_READ_TYPES],
   });
+
+  const readAuthorized = new Set((auth.readAuthorized ?? []) as HealthReadType[]);
+  const readDenied = (auth.readDenied ?? []) as string[];
+
+  if (readAuthorized.size === 0) {
+    throw new Error(
+      readDenied.length > 0
+        ? permissionDeniedMessage(readDenied)
+        : "Aucune autorisation Health Connect accordée. Réessayez et acceptez au moins pas, poids ou fréquence cardiaque.",
+    );
+  }
 
   const end = new Date();
   const start = new Date();
@@ -97,41 +121,71 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
 
   const byDate = new Map<string, LocalSyncRecord>();
 
-  const stepsResult = await Health.readSamples({
-    dataType: "steps",
-    startDate: startIso,
-    endDate: endIso,
-    limit: 5000,
-  });
-  for (const sample of stepsResult.samples ?? []) {
-    const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-    const row = ensureDay(byDate, key);
-    row.step_count = (row.step_count ?? 0) + (sample.value ?? 0);
+  if (readAuthorized.has("steps")) {
+    try {
+      const stepsResult = await Health.readSamples({
+        dataType: "steps",
+        startDate: startIso,
+        endDate: endIso,
+        limit: 5000,
+      });
+      for (const sample of stepsResult.samples ?? []) {
+        const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+        const row = ensureDay(byDate, key);
+        row.step_count = (row.step_count ?? 0) + (sample.value ?? 0);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/SecurityException|permission/i.test(msg)) {
+        throw new Error(permissionDeniedMessage(["steps"]));
+      }
+      throw err;
+    }
   }
 
-  const weightResult = await Health.readSamples({
-    dataType: "weight",
-    startDate: startIso,
-    endDate: endIso,
-    limit: 500,
-  });
-  for (const sample of weightResult.samples ?? []) {
-    const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-    const row = ensureDay(byDate, key);
-    row.weight = sample.value ?? row.weight;
+  if (readAuthorized.has("weight")) {
+    try {
+      const weightResult = await Health.readSamples({
+        dataType: "weight",
+        startDate: startIso,
+        endDate: endIso,
+        limit: 500,
+      });
+      for (const sample of weightResult.samples ?? []) {
+        const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+        const row = ensureDay(byDate, key);
+        row.weight = sample.value ?? row.weight;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/SecurityException|permission/i.test(msg)) {
+        throw new Error(permissionDeniedMessage(["weight"]));
+      }
+      throw err;
+    }
   }
 
-  const hrResult = await Health.readSamples({
-    dataType: "heartRate",
-    startDate: startIso,
-    endDate: endIso,
-    limit: 500,
-  });
-  for (const sample of hrResult.samples ?? []) {
-    const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-    const row = ensureDay(byDate, key);
-    if (row.resting_heart_rate == null) {
-      row.resting_heart_rate = Math.round(sample.value ?? 0);
+  if (readAuthorized.has("heartRate")) {
+    try {
+      const hrResult = await Health.readSamples({
+        dataType: "heartRate",
+        startDate: startIso,
+        endDate: endIso,
+        limit: 500,
+      });
+      for (const sample of hrResult.samples ?? []) {
+        const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+        const row = ensureDay(byDate, key);
+        if (row.resting_heart_rate == null) {
+          row.resting_heart_rate = Math.round(sample.value ?? 0);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/SecurityException|permission/i.test(msg)) {
+        throw new Error(permissionDeniedMessage(["heartRate"]));
+      }
+      throw err;
     }
   }
 

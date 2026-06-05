@@ -4,6 +4,7 @@ import {
   getHealthSyncContext,
   isNativeHealthAvailable,
   readPlatformHealthData,
+  summarizeHealthRecords,
 } from "../lib/healthConnect";
 import type { IntegrationStatus } from "../types";
 
@@ -63,7 +64,7 @@ export function useHealthIntegration(token: string | null) {
       }
       await api.connectHealthConnect(token);
       const result = await api.syncHealthConnect(token, records);
-      setMessage(result.message);
+      setMessage(`${result.message} (${summarizeHealthRecords(records)})`);
       await refresh();
     } catch (err) {
       if (err instanceof Error && err.message === "NATIVE_REQUIRED") {
@@ -96,7 +97,7 @@ export function useHealthIntegration(token: string | null) {
         return;
       }
       const result = await api.syncHealthConnect(token, records);
-      setMessage(result.message);
+      setMessage(`${result.message} (${summarizeHealthRecords(records)})`);
       await refresh();
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);

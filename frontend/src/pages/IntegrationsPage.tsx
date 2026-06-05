@@ -100,8 +100,8 @@ export function IntegrationsPage() {
             )}
           </div>
           <p className="sub integration-hint">
-            Import automatique : pas, poids, masse grasse (%), FC au repos (selon ce que vos apps
-            partagent via Health Connect).
+            Import automatique : pas, poids, masse grasse (%), FC (repos ou min. journalière),
+            tension (selon ce que vos apps partagent via Health Connect).
             Sommeil, stress et notes : saisie manuelle dans l&apos;onglet Aujourd&apos;hui.
           </p>
         </section>

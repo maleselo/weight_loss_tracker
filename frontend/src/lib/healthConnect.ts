@@ -19,14 +19,24 @@ export type HealthSyncContext =
   | "mobile-browser"
   | "desktop-browser";
 
-const HEALTH_READ_TYPES = ["steps", "weight", "restingHeartRate", "bodyFat"] as const;
+// heartRate : la plupart des apps (Samsung Health, Fitbit…) n'écrivent que ce type, pas restingHeartRate.
+const HEALTH_READ_TYPES = [
+  "steps",
+  "weight",
+  "restingHeartRate",
+  "heartRate",
+  "bodyFat",
+  "bloodPressure",
+] as const;
 type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
 
 const PERMISSION_LABELS: Record<string, string> = {
   steps: "pas",
   weight: "poids",
   restingHeartRate: "fréquence cardiaque au repos",
+  heartRate: "fréquence cardiaque",
   bodyFat: "masse grasse (%)",
+  bloodPressure: "tension",
 };
 
 export function isMobileBrowser(): boolean {
@@ -60,12 +70,34 @@ export function nativePlatformLabel(): string {
   return "navigateur ordinateur";
 }
 
+/** Résumé lisible des métriques importées (pour message utilisateur). */
+export function summarizeHealthRecords(records: LocalSyncRecord[]): string {
+  const count = (fn: (r: LocalSyncRecord) => boolean) => records.filter(fn).length;
+  const parts: string[] = [];
+  const steps = count((r) => r.step_count != null);
+  const weight = count((r) => r.weight != null);
+  const bf = count((r) => r.body_fat_percentage != null);
+  const hr = count((r) => r.resting_heart_rate != null);
+  const bp = count((r) => r.blood_pressure_sys != null && r.blood_pressure_dia != null);
+  if (steps) parts.push(`${steps} j. de pas`);
+  if (weight) parts.push(`${weight} j. de poids`);
+  if (bf) parts.push(`${bf} j. de masse grasse`);
+  if (hr) parts.push(`${hr} j. de FC`);
+  if (bp) parts.push(`${bp} j. de tension`);
+  return parts.length ? parts.join(", ") : "aucune métrique";
+}
+
 function toLocalDateKey(iso: string): string {
   const d = new Date(iso);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function sampleTimestamp(sample: { startDate?: string; endDate?: string }): number {
+  const iso = sample.endDate ?? sample.startDate;
+  return iso ? Date.parse(iso) : 0;
 }
 
 function ensureDay(map: Map<string, LocalSyncRecord>, date: string): LocalSyncRecord {
@@ -80,6 +112,27 @@ function ensureDay(map: Map<string, LocalSyncRecord>, date: string): LocalSyncRe
 function permissionDeniedMessage(denied: string[]): string {
   const list = denied.map((d) => PERMISSION_LABELS[d] ?? d).join(", ");
   return `Autorisation refusée pour : ${list}. Ouvrez Health Connect → Autorisations des applications → Tableau de bord santé, puis activez la lecture.`;
+}
+
+/** Certaines sources envoient 0.22 au lieu de 22 %. */
+function normalizeBodyFatPercent(value: number | undefined): number | undefined {
+  if (value == null || Number.isNaN(value)) return undefined;
+  const pct = value > 0 && value <= 1 ? value * 100 : value;
+  if (pct < 1 || pct > 80) return undefined;
+  return Math.round(pct * 10) / 10;
+}
+
+function setLatestSample(
+  latest: Map<string, { value: number; at: number }>,
+  date: string,
+  value: number | undefined,
+  at: number,
+) {
+  if (value == null || Number.isNaN(value)) return;
+  const prev = latest.get(date);
+  if (!prev || at >= prev.at) {
+    latest.set(date, { value, at });
+  }
 }
 
 async function readSamplesSafe(
@@ -134,7 +187,7 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
     throw new Error(
       readDenied.length > 0
         ? permissionDeniedMessage(readDenied)
-        : "Aucune autorisation Health Connect accordée. Réessayez et acceptez au moins pas, poids, FC repos ou masse grasse.",
+        : "Aucune autorisation Health Connect accordée. Réessayez et acceptez au moins pas, poids, FC ou masse grasse.",
     );
   }
 
@@ -146,6 +199,10 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
 
   const byDate = new Map<string, LocalSyncRecord>();
   const restingHrByDay = new Map<string, number[]>();
+  const heartRateMinByDay = new Map<string, number>();
+  const latestWeight = new Map<string, { value: number; at: number }>();
+  const latestBodyFat = new Map<string, { value: number; at: number }>();
+  const latestBp = new Map<string, { sys: number; dia: number; at: number }>();
 
   if (readAuthorized.has("steps")) {
     const stepsResult = await readSamplesSafe(Health, "steps", startIso, endIso, 5000);
@@ -160,8 +217,7 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
     const weightResult = await readSamplesSafe(Health, "weight", startIso, endIso, 500);
     for (const sample of weightResult.samples ?? []) {
       const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-      const row = ensureDay(byDate, key);
-      row.weight = sample.value ?? row.weight;
+      setLatestSample(latestWeight, key, sample.value, sampleTimestamp(sample));
     }
   }
 
@@ -169,9 +225,10 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
     const bfResult = await readSamplesSafe(Health, "bodyFat", startIso, endIso, 500);
     for (const sample of bfResult.samples ?? []) {
       const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-      const row = ensureDay(byDate, key);
-      // Health Connect : percent (0–100)
-      row.body_fat_percentage = sample.value ?? row.body_fat_percentage;
+      const pct = normalizeBodyFatPercent(sample.value);
+      if (pct != null) {
+        setLatestSample(latestBodyFat, key, pct, sampleTimestamp(sample));
+      }
     }
   }
 
@@ -183,11 +240,57 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
       values.push(sample.value ?? 0);
       restingHrByDay.set(key, values);
     }
-    for (const [key, values] of restingHrByDay) {
-      const row = ensureDay(byDate, key);
-      const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-      row.resting_heart_rate = Math.round(avg);
+  }
+
+  if (readAuthorized.has("heartRate")) {
+    const hrResult = await readSamplesSafe(Health, "heartRate", startIso, endIso, 2000);
+    for (const sample of hrResult.samples ?? []) {
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const bpm = sample.value;
+      if (bpm == null || Number.isNaN(bpm)) continue;
+      const prev = heartRateMinByDay.get(key);
+      if (prev == null || bpm < prev) {
+        heartRateMinByDay.set(key, bpm);
+      }
     }
+  }
+
+  if (readAuthorized.has("bloodPressure")) {
+    const bpResult = await readSamplesSafe(Health, "bloodPressure", startIso, endIso, 500);
+    for (const sample of bpResult.samples ?? []) {
+      const sys = sample.systolic ?? sample.value;
+      const dia = sample.diastolic;
+      if (sys == null || dia == null) continue;
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      const at = sampleTimestamp(sample);
+      const prev = latestBp.get(key);
+      if (!prev || at >= prev.at) {
+        latestBp.set(key, { sys: Math.round(sys), dia: Math.round(dia), at });
+      }
+    }
+  }
+
+  for (const [key, entry] of latestWeight) {
+    ensureDay(byDate, key).weight = entry.value;
+  }
+  for (const [key, entry] of latestBodyFat) {
+    ensureDay(byDate, key).body_fat_percentage = entry.value;
+  }
+  for (const [key, values] of restingHrByDay) {
+    const row = ensureDay(byDate, key);
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+    row.resting_heart_rate = Math.round(avg);
+  }
+  for (const [key, minBpm] of heartRateMinByDay) {
+    const row = ensureDay(byDate, key);
+    if (row.resting_heart_rate == null) {
+      row.resting_heart_rate = Math.round(minBpm);
+    }
+  }
+  for (const [key, entry] of latestBp) {
+    const row = ensureDay(byDate, key);
+    row.blood_pressure_sys = entry.sys;
+    row.blood_pressure_dia = entry.dia;
   }
 
   return [...byDate.values()]
@@ -196,7 +299,8 @@ export async function readPlatformHealthData(days = 30): Promise<LocalSyncRecord
         r.step_count != null ||
         r.weight != null ||
         r.body_fat_percentage != null ||
-        r.resting_heart_rate != null,
+        r.resting_heart_rate != null ||
+        (r.blood_pressure_sys != null && r.blood_pressure_dia != null),
     )
     .sort((a, b) => a.date.localeCompare(b.date));
 }

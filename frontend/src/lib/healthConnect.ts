@@ -164,6 +164,31 @@ async function readSamplesSafe(
   }
 }
 
+/** Agrégation journalière — couvre toute la période (pas de plafond d'échantillons). */
+async function queryDailyAggregatedSafe(
+  Health: Awaited<typeof import("@capgo/capacitor-health")>["Health"],
+  dataType: "restingHeartRate" | "heartRate",
+  startIso: string,
+  endIso: string,
+  aggregation: "average" | "min",
+) {
+  try {
+    return await Health.queryAggregated({
+      dataType,
+      startDate: startIso,
+      endDate: endIso,
+      bucket: "day",
+      aggregation,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/SecurityException|permission/i.test(msg)) {
+      throw new Error(permissionDeniedMessage([dataType]));
+    }
+    throw err;
+  }
+}
+
 /** Lit Health Connect (Android) — hub unique après config des apps sources. */
 export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[]> {
   if (!isNativeHealthAvailable()) {
@@ -243,25 +268,30 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
   }
 
   if (readAuthorized.has("restingHeartRate")) {
-    const hrResult = await readSamplesSafe(Health, "restingHeartRate", startIso, endIso, 500);
+    const hrResult = await queryDailyAggregatedSafe(
+      Health,
+      "restingHeartRate",
+      startIso,
+      endIso,
+      "average",
+    );
     for (const sample of hrResult.samples ?? []) {
+      const bpm = sample.value;
+      if (bpm == null || Number.isNaN(bpm)) continue;
       const key = toLocalDateKey(sample.startDate ?? sample.endDate);
       const values = restingHrByDay.get(key) ?? [];
-      values.push(sample.value ?? 0);
+      values.push(bpm);
       restingHrByDay.set(key, values);
     }
   }
 
   if (readAuthorized.has("heartRate")) {
-    const hrResult = await readSamplesSafe(Health, "heartRate", startIso, endIso, 2000);
+    const hrResult = await queryDailyAggregatedSafe(Health, "heartRate", startIso, endIso, "min");
     for (const sample of hrResult.samples ?? []) {
-      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
       const bpm = sample.value;
       if (bpm == null || Number.isNaN(bpm)) continue;
-      const prev = heartRateMinByDay.get(key);
-      if (prev == null || bpm < prev) {
-        heartRateMinByDay.set(key, bpm);
-      }
+      const key = toLocalDateKey(sample.startDate ?? sample.endDate);
+      heartRateMinByDay.set(key, bpm);
     }
   }
 

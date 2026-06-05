@@ -384,6 +384,24 @@ label.field textarea:focus {
   color: var(--teal-900);
 }
 
+.auth-intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--slate-600);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.field-hint a {
+  color: var(--teal-700);
+}
+
 .auth-footer {
   text-align: center;
   margin-top: 1rem;

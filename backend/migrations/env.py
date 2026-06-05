@@ -8,6 +8,7 @@ from app.core.config import normalize_postgres_url, settings
 from app.db.base import Base
 from app.models.daily_measurement import DailyMeasurement  # noqa: F401
 from app.models.health_connection import HealthConnection  # noqa: F401
+from app.models.password_reset_token import PasswordResetToken  # noqa: F401
 from app.models.user import User  # noqa: F401
 
 config = context.config

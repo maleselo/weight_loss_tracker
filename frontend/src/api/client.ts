@@ -102,6 +102,18 @@ export const api = {
     });
   },
 
+  forgotPassword: (email: string) =>
+    request<{ message: string; debug_reset_url?: string | null }>("/api/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<{ message: string }>("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
+
   me: (token: string) => request<User>("/api/auth/me", { token }),
 
   updateMe: (token: string, data: UserUpdate) =>

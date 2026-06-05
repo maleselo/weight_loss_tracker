@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     health_sync_token: str = ""
     health_sync_user_email: str = ""
 
+    # Mot de passe oublié
+    frontend_url: str = "http://localhost:5173"
+    password_reset_expire_minutes: int = 60
+
+    # SMTP (optionnel — sans config, le lien est loggé en dev)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_tls: bool = True
+
     @field_validator("database_url", mode="before")
     @classmethod
     def _normalize_database_url(cls, value: str) -> str:

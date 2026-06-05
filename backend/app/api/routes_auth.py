@@ -8,7 +8,14 @@ from app.api.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import Token
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    MessageResponse,
+    ResetPasswordRequest,
+    Token,
+)
+from app.services.password_reset import FORGOT_PASSWORD_MESSAGE, request_password_reset, reset_password
 from app.schemas.user import UserCreate, UserOut, UserUpdate
 
 router = APIRouter()
@@ -42,6 +49,19 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
             headers={"WWW-Authenticate": "Bearer"},
         )
     return Token(access_token=create_access_token(str(user.id)))
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    debug_url = request_password_reset(db, payload.email)
+    return ForgotPasswordResponse(message=FORGOT_PASSWORD_MESSAGE, debug_reset_url=debug_url)
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password_route(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    if not reset_password(db, payload.token, payload.password):
+        raise HTTPException(status_code=400, detail="Lien invalide ou expiré. Demandez un nouveau lien.")
+    return MessageResponse(message="Mot de passe mis à jour. Vous pouvez vous connecter.")
 
 
 @router.get("/me", response_model=UserOut)

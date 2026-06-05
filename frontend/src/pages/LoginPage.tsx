@@ -51,6 +51,9 @@ export function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <span className="field-hint">
+            <Link to="/mot-de-passe-oublie">Mot de passe oublié ?</Link>
+          </span>
         </label>
         <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? "Connexion…" : "Se connecter"}

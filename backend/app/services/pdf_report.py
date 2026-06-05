@@ -238,7 +238,7 @@ def build_health_report_pdf(
     if include_context:
         story.append(Spacer(1, 0.4 * cm))
         story.append(Paragraph("Contexte & notes", section_style))
-        context_rows = [["Date", "Entraînement", "Alcool", "Cheat Meal", "Notes"]]
+        context_rows = [["Date", "Entraînement", "Alcool", "Repas plaisir", "Notes"]]
         for m in sorted(measurements, key=lambda x: x.date):
             notes = (m.notes or "").replace("\n", " ").strip()
             if len(notes) > 60:

@@ -19,7 +19,7 @@ HEADERS = [
     "Faim (1-3)",
     "Entraînement",
     "Alcool",
-    "Cheat meal",
+    "Repas plaisir",
     "Notes",
 ]
 

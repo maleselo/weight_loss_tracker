@@ -289,7 +289,7 @@ export function TodayPage() {
                 checked={form.cheat_meal}
                 onChange={(e) => setForm((f) => ({ ...f, cheat_meal: e.target.checked }))}
               />
-              Cheat Meal
+              Repas plaisir
             </label>
           </div>
 

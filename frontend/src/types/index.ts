@@ -85,6 +85,7 @@ export interface HealthSyncRecordInput {
   step_count?: number;
   blood_pressure_sys?: number;
   blood_pressure_dia?: number;
+  sleep_quality?: number;
 }
 
 export type MeasurementForm = Omit<DailyMeasurement, "id" | "date">;

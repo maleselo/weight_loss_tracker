@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { computeSleepQualityScore } from "./sleepScore";
 
 export interface LocalSyncRecord {
   date: string;
@@ -8,6 +9,7 @@ export interface LocalSyncRecord {
   step_count?: number;
   blood_pressure_sys?: number;
   blood_pressure_dia?: number;
+  sleep_quality?: number;
 }
 
 export type NativeHealthPlatform = "android" | "ios" | "web";
@@ -27,6 +29,7 @@ const HEALTH_READ_TYPES = [
   "heartRate",
   "bodyFat",
   "bloodPressure",
+  "sleep",
 ] as const;
 type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
 
@@ -37,6 +40,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   heartRate: "fréquence cardiaque",
   bodyFat: "masse grasse (%)",
   bloodPressure: "tension",
+  sleep: "sommeil",
 };
 
 export function isMobileBrowser(): boolean {
@@ -79,11 +83,13 @@ export function summarizeHealthRecords(records: LocalSyncRecord[]): string {
   const bf = count((r) => r.body_fat_percentage != null);
   const hr = count((r) => r.resting_heart_rate != null);
   const bp = count((r) => r.blood_pressure_sys != null && r.blood_pressure_dia != null);
+  const sleep = count((r) => r.sleep_quality != null);
   if (steps) parts.push(`${steps} j. de pas`);
   if (weight) parts.push(`${weight} j. de poids`);
   if (bf) parts.push(`${bf} j. de masse grasse`);
   if (hr) parts.push(`${hr} j. de FC`);
   if (bp) parts.push(`${bp} j. de tension`);
+  if (sleep) parts.push(`${sleep} j. de sommeil`);
   return parts.length ? parts.join(", ") : "aucune métrique";
 }
 
@@ -203,6 +209,10 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
   const latestWeight = new Map<string, { value: number; at: number }>();
   const latestBodyFat = new Map<string, { value: number; at: number }>();
   const latestBp = new Map<string, { sys: number; dia: number; at: number }>();
+  const sleepByWakeDate = new Map<
+    string,
+    { durationMinutes: number; hasStageData?: boolean; stages?: { stage: string; durationMinutes: number }[] }
+  >();
 
   if (readAuthorized.has("steps")) {
     const stepsResult = await readSamplesSafe(Health, "steps", startIso, endIso, 5000);
@@ -293,6 +303,30 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
     row.blood_pressure_dia = entry.dia;
   }
 
+  if (readAuthorized.has("sleep")) {
+    const sleepResult = await readSamplesSafe(Health, "sleep", startIso, endIso, 500);
+    for (const sample of sleepResult.samples ?? []) {
+      const durationMinutes = sample.value ?? 0;
+      if (durationMinutes < 30) continue;
+      const wakeDate = toLocalDateKey(sample.endDate ?? sample.startDate);
+      const prev = sleepByWakeDate.get(wakeDate);
+      if (!prev || durationMinutes > prev.durationMinutes) {
+        sleepByWakeDate.set(wakeDate, {
+          durationMinutes,
+          hasStageData: sample.hasStageData,
+          stages: sample.stages?.map((stage) => ({
+            stage: stage.stage,
+            durationMinutes: stage.durationMinutes ?? 0,
+          })),
+        });
+      }
+    }
+  }
+
+  for (const [key, session] of sleepByWakeDate) {
+    ensureDay(byDate, key).sleep_quality = computeSleepQualityScore(session);
+  }
+
   return [...byDate.values()]
     .filter(
       (r) =>
@@ -300,7 +334,8 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
         r.weight != null ||
         r.body_fat_percentage != null ||
         r.resting_heart_rate != null ||
-        (r.blood_pressure_sys != null && r.blood_pressure_dia != null),
+        (r.blood_pressure_sys != null && r.blood_pressure_dia != null) ||
+        r.sleep_quality != null,
     )
     .sort((a, b) => a.date.localeCompare(b.date));
 }

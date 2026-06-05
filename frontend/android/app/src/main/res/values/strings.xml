@@ -3,7 +3,7 @@
     <string name="app_name">Tableau de bord santé</string>
     <string name="title_activity_main">Tableau de bord santé</string>
     <string name="health_connect_privacy_title">Données santé</string>
-    <string name="health_connect_privacy_policy">Cette application lit vos données Health Connect (pas, poids, fréquence cardiaque) uniquement pour les afficher dans votre tableau de bord personnel.\n\nLes données sont transmises de manière sécurisée à votre compte sur nos serveurs. Nous ne vendons ni ne partageons vos données avec des tiers.\n\nVous pouvez révoquer l\'accès à tout moment dans l\'application Health Connect.</string>
+    <string name="health_connect_privacy_policy">Cette application lit vos données Health Connect (pas, poids, fréquence cardiaque, sommeil) uniquement pour les afficher dans votre tableau de bord personnel.\n\nLes données sont transmises de manière sécurisée à votre compte sur nos serveurs. Nous ne vendons ni ne partageons vos données avec des tiers.\n\nVous pouvez révoquer l\'accès à tout moment dans l\'application Health Connect.</string>
     <string name="package_name">com.healthdashboard.app</string>
     <string name="custom_url_scheme">com.healthdashboard.app</string>
 </resources>

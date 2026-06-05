@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.daily_measurement import DailyMeasurement
 from app.models.health_connection import HealthConnection
 from app.schemas.integrations import HealthSyncRecord
 from app.services.measurements import upsert_daily_measurement
@@ -54,6 +55,17 @@ def sync_records(
 
     for record in records:
         fields = record.to_measurement_fields()
+        if not fields:
+            continue
+        if "sommeil" in fields:
+            existing = db.scalars(
+                select(DailyMeasurement).where(
+                    DailyMeasurement.user_id == user_id,
+                    DailyMeasurement.date == record.date,
+                )
+            ).first()
+            if existing is not None and existing.sommeil is not None:
+                del fields["sommeil"]
         if not fields:
             continue
         try:

@@ -178,13 +178,16 @@ async function readSamplesSafe(
   }
 }
 
+type DailyAggregatedType = "restingHeartRate" | "heartRate" | "steps";
+type DailyAggregation = "average" | "min" | "sum";
+
 /** Agrégation journalière — couvre toute la période (pas de plafond d'échantillons). */
 async function queryDailyAggregatedSafe(
   Health: Awaited<typeof import("@capgo/capacitor-health")>["Health"],
-  dataType: "restingHeartRate" | "heartRate",
+  dataType: DailyAggregatedType,
   startIso: string,
   endIso: string,
-  aggregation: "average" | "min",
+  aggregation: DailyAggregation,
 ) {
   try {
     return await Health.queryAggregated({
@@ -238,6 +241,7 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
 
   const end = new Date();
   const start = new Date();
+  start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - days);
   const startIso = start.toISOString();
   const endIso = end.toISOString();
@@ -254,11 +258,12 @@ export async function readPlatformHealthData(days = 7): Promise<LocalSyncRecord[
   >();
 
   if (readAuthorized.has("steps")) {
-    const stepsResult = await readSamplesSafe(Health, "steps", startIso, endIso, 5000);
+    const stepsResult = await queryDailyAggregatedSafe(Health, "steps", startIso, endIso, "sum");
     for (const sample of stepsResult.samples ?? []) {
+      const count = sample.value;
+      if (count == null || Number.isNaN(count)) continue;
       const key = toLocalDateKey(sample.startDate ?? sample.endDate);
-      const row = ensureDay(byDate, key);
-      row.step_count = (row.step_count ?? 0) + (sample.value ?? 0);
+      ensureDay(byDate, key).step_count = Math.round(count);
     }
   }
 

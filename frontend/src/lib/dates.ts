@@ -1,6 +1,13 @@
+/** Date calendaire locale au format YYYY-MM-DD (pas UTC — évite le décalage après minuit). */
+export function localISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function todayISO(): string {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return localISODate(new Date());
 }
 
 export function formatDateFR(iso: string): string {
@@ -16,7 +23,7 @@ export function formatDateFR(iso: string): string {
 export function daysAgoISO(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return localISODate(d);
 }
 
 export function formatDelta(value: number | null, unit = ""): string {

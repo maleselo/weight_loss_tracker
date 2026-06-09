@@ -1,6 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
-import { AndroidAppInstall } from "../components/AndroidAppInstall";
 import { WeightChart } from "../components/WeightChart";
 import { WeightGoalGauge } from "../components/WeightGoalGauge";
 import { useAuth } from "../context/AuthContext";
@@ -111,8 +110,6 @@ export function DashboardPage() {
 
   return (
     <>
-      <AndroidAppInstall />
-
       {isTracked("poids_kg") && (
       <div className="card">
         <h2>Poids</h2>

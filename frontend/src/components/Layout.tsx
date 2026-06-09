@@ -1,11 +1,23 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { AppVersion } from "./AppVersion";
+import { WhatsNewModal } from "./WhatsNewModal";
 import { useAuth } from "../context/AuthContext";
+import { needsWhatsNew, whatsNewToggles } from "../hooks/useTrackedFields";
+import { TRACKING_CATALOG_VERSION } from "../lib/trackingCatalog";
 import { useTodayHealthSyncOnOpen } from "../hooks/useTodayHealthSyncOnOpen";
 
 export function Layout() {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const [whatsNewDismissed, setWhatsNewDismissed] = useState(false);
+  const pendingNewToggles = whatsNewToggles(user);
+  const showWhatsNew = needsWhatsNew(user) && !whatsNewDismissed && pendingNewToggles.length > 0;
+
+  useEffect(() => {
+    if (!user || !needsWhatsNew(user) || pendingNewToggles.length > 0) return;
+    void updateProfile({ catalog_version_seen: TRACKING_CATALOG_VERSION });
+  }, [user, pendingNewToggles.length, updateProfile]);
 
   useTodayHealthSyncOnOpen(token);
 
@@ -14,7 +26,12 @@ export function Layout() {
       <header className="app-header">
         <div className="app-header__title-row">
           <h1>Tableau de bord santé</h1>
-          <AppVersion />
+          <div className="app-header__actions">
+            <Link to="/parametres" className="btn-icon btn-icon--header" aria-label="Paramètres" title="Paramètres">
+              ⚙
+            </Link>
+            <AppVersion />
+          </div>
         </div>
         <p>{user?.email}</p>
         <button
@@ -28,6 +45,7 @@ export function Layout() {
           Déconnexion
         </button>
       </header>
+      {showWhatsNew && <WhatsNewModal onDismiss={() => setWhatsNewDismissed(true)} />}
 
       <main className="app-main">
         <Outlet />

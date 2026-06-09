@@ -2,16 +2,19 @@ import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { AppVersion } from "../components/AppVersion";
 import { getAuthErrorMessage, useAuth } from "../context/AuthContext";
+import { needsOnboarding } from "../hooks/useTrackedFields";
 
 export function LoginPage() {
-  const { login, token, loading } = useAuth();
+  const { login, token, loading, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && token) return <Navigate to="/" replace />;
+  if (!loading && token) {
+    return <Navigate to={needsOnboarding(user) ? "/onboarding" : "/"} replace />;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

@@ -89,6 +89,16 @@ def _build_weight_chart(
     return buf
 
 
+def _tracked_set(tracked_fields: Sequence[str] | None) -> set[str] | None:
+    if not tracked_fields:
+        return None
+    return set(tracked_fields)
+
+
+def _show(field: str, tracked: set[str] | None) -> bool:
+    return tracked is None or field in tracked
+
+
 def build_health_report_pdf(
     *,
     user: User,
@@ -98,7 +108,9 @@ def build_health_report_pdf(
     include_chart: bool = True,
     include_table: bool = True,
     include_context: bool = True,
+    tracked_fields: Sequence[str] | None = None,
 ) -> bytes:
+    tracked = _tracked_set(tracked_fields)
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -151,74 +163,73 @@ def build_health_report_pdf(
     poids_summary = build_metric_summary(poids_rows, ref_date)
     poids_cible = float(user.poids_cible_kg) if user.poids_cible_kg is not None else None
 
-    story.append(Paragraph("Synthèse poids", section_style))
-    summary_data = [
-        ["Indicateur", "Valeur"],
-        ["Poids (dernière mesure)", _fmt_num(poids_summary.valeur_actuelle, " kg")],
-        ["Objectif", _fmt_num(poids_cible, " kg") if poids_cible else "—"],
-        ["Moyenne mobile 7 j", _fmt_num(poids_summary.moyenne_mobile_7j, " kg")],
-        ["Variation 7 j", _fmt_delta(poids_summary.delta_7j, " kg")],
-        ["Variation 30 j", _fmt_delta(poids_summary.delta_30j, " kg")],
-        ["Tendance 14 j", _fmt_delta(poids_summary.tendance_14j_par_jour, " kg/j")],
-    ]
-    summary_table = Table(summary_data, colWidths=[8 * cm, 8 * cm])
-    summary_table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdfa")]),
-            ]
+    if _show("poids_kg", tracked):
+        story.append(Paragraph("Synthèse poids", section_style))
+        summary_data = [
+            ["Indicateur", "Valeur"],
+            ["Poids (dernière mesure)", _fmt_num(poids_summary.valeur_actuelle, " kg")],
+            ["Objectif", _fmt_num(poids_cible, " kg") if poids_cible else "—"],
+            ["Moyenne mobile 7 j", _fmt_num(poids_summary.moyenne_mobile_7j, " kg")],
+            ["Variation 7 j", _fmt_delta(poids_summary.delta_7j, " kg")],
+            ["Variation 30 j", _fmt_delta(poids_summary.delta_30j, " kg")],
+            ["Tendance 14 j", _fmt_delta(poids_summary.tendance_14j_par_jour, " kg/j")],
+        ]
+        summary_table = Table(summary_data, colWidths=[8 * cm, 8 * cm])
+        summary_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdfa")]),
+                ]
+            )
         )
-    )
-    story.append(summary_table)
-    story.append(Spacer(1, 0.4 * cm))
+        story.append(summary_table)
+        story.append(Spacer(1, 0.4 * cm))
 
-    if include_chart:
+    if include_chart and _show("poids_kg", tracked):
         chart_buf = _build_weight_chart(measurements, poids_cible)
         if chart_buf:
             story.append(Paragraph("Graphique", section_style))
             story.append(Image(chart_buf, width=16 * cm, height=6.5 * cm))
             story.append(Spacer(1, 0.3 * cm))
 
-    if include_table:
-        story.append(Paragraph("Détail journalier", section_style))
-        table_header = [
-            "Date",
-            "Poids",
-            "% MG",
+    detail_cols: list[tuple[str, str, object]] = [
+        ("poids_kg", "Poids", lambda m: _fmt_num(float(m.poids_kg) if m.poids_kg is not None else None, " kg")),
+        ("masse_grasse_pct", "% MG", lambda m: _fmt_num(float(m.masse_grasse_pct) if m.masse_grasse_pct is not None else None, " %")),
+        (
+            "tension_sys_mmhg",
             "Tension",
-            "Pas",
-            "Somm.",
-            "Stress",
-            "Énergie",
-            "Faim",
-        ]
-        table_rows = [table_header]
-        for m in sorted(measurements, key=lambda x: x.date):
-            tension = (
+            lambda m: (
                 f"{m.tension_sys_mmhg}/{m.tension_dia_mmhg}"
                 if m.tension_sys_mmhg is not None and m.tension_dia_mmhg is not None
                 else "—"
-            )
-            table_rows.append(
-                [
-                    m.date.strftime("%d/%m/%Y"),
-                    _fmt_num(float(m.poids_kg) if m.poids_kg is not None else None, " kg"),
-                    _fmt_num(float(m.masse_grasse_pct) if m.masse_grasse_pct is not None else None, " %"),
-                    tension,
-                    _fmt_num(m.nb_pas),
-                    _fmt_num(m.sommeil),
-                    _fmt_num(m.stress),
-                    _fmt_num(m.energie),
-                    _fmt_num(m.faim),
-                ]
-            )
+            ),
+        ),
+        ("nb_pas", "Pas", lambda m: _fmt_num(m.nb_pas)),
+        ("sommeil", "Somm.", lambda m: _fmt_num(m.sommeil)),
+        ("stress", "Stress", lambda m: _fmt_num(m.stress)),
+        ("energie", "Énergie", lambda m: _fmt_num(m.energie)),
+        ("faim", "Faim", lambda m: _fmt_num(m.faim)),
+    ]
+    def _show_detail(key: str) -> bool:
+        if key == "tension_sys_mmhg":
+            return _show("tension_sys_mmhg", tracked) or _show("tension_dia_mmhg", tracked)
+        return _show(key, tracked)
 
-        col_widths = [2.2 * cm, 1.5 * cm, 1.3 * cm, 2 * cm, 1.5 * cm, 1.1 * cm, 1.1 * cm, 1.1 * cm, 1.1 * cm]
+    active_detail = [c for c in detail_cols if _show_detail(c[0])]
+
+    if include_table and active_detail:
+        story.append(Paragraph("Détail journalier", section_style))
+        table_header = ["Date"] + [c[1] for c in active_detail]
+        table_rows = [table_header]
+        for m in sorted(measurements, key=lambda x: x.date):
+            table_rows.append([m.date.strftime("%d/%m/%Y")] + [c[2](m) for c in active_detail])
+
+        col_widths = [2.2 * cm] + [1.5 * cm] * len(active_detail)
         data_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
         data_table.setStyle(
             TableStyle(
@@ -235,26 +246,24 @@ def build_health_report_pdf(
         )
         story.append(data_table)
 
-    if include_context:
+    context_cols: list[tuple[str, str, object]] = [
+        ("entrainement", "Entraînement", lambda m: _bool_fr(m.entrainement)),
+        ("alcool", "Alcool", lambda m: _bool_fr(m.alcool)),
+        ("cheat_meal", "Repas plaisir", lambda m: _bool_fr(m.cheat_meal)),
+        ("notes", "Notes", lambda m: ((m.notes or "").replace("\n", " ").strip()[:57] + "…") if len((m.notes or "")) > 60 else ((m.notes or "").replace("\n", " ").strip() or "—")),
+    ]
+    active_context = [c for c in context_cols if _show(c[0], tracked)]
+
+    if include_context and active_context:
         story.append(Spacer(1, 0.4 * cm))
         story.append(Paragraph("Contexte & notes", section_style))
-        context_rows = [["Date", "Entraînement", "Alcool", "Repas plaisir", "Notes"]]
+        context_rows = [["Date"] + [c[1] for c in active_context]]
         for m in sorted(measurements, key=lambda x: x.date):
-            notes = (m.notes or "").replace("\n", " ").strip()
-            if len(notes) > 60:
-                notes = notes[:57] + "…"
-            context_rows.append(
-                [
-                    m.date.strftime("%d/%m/%Y"),
-                    _bool_fr(m.entrainement),
-                    _bool_fr(m.alcool),
-                    _bool_fr(m.cheat_meal),
-                    notes or "—",
-                ]
-            )
+            context_rows.append([m.date.strftime("%d/%m/%Y")] + [c[2](m) for c in active_context])
+        n = len(active_context)
         context_table = Table(
             context_rows,
-            colWidths=[2.2 * cm, 2.5 * cm, 2 * cm, 2.5 * cm, 6.3 * cm],
+            colWidths=[2.2 * cm] + ([2.2 * cm] * (n - 1) if n > 1 else [6.3 * cm]),
             repeatRows=1,
         )
         context_table.setStyle(

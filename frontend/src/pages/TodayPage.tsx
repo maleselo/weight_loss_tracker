@@ -5,6 +5,7 @@ import { FieldLabelWithOverride } from "../components/FieldLabelWithOverride";
 import { SleepScaleInput } from "../components/SleepScaleInput";
 import { TextScaleInput } from "../components/TextScaleInput";
 import { useAuth } from "../context/AuthContext";
+import { useTrackedFields } from "../hooks/useTrackedFields";
 import { formatDateFR, todayISO } from "../lib/dates";
 import {
   getHealthConnectAuthorizedTypes,
@@ -57,6 +58,7 @@ const SAVED_HINT_MS = 2000;
 
 export function TodayPage() {
   const { token } = useAuth();
+  const { isTracked, isTensionTracked, hasWellbeing, hasHabits } = useTrackedFields();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const today = todayISO();
@@ -325,7 +327,13 @@ export function TodayPage() {
             )}
           </section>
 
+          {(isTracked("poids_kg") ||
+            isTracked("masse_grasse_pct") ||
+            isTracked("tour_taille_cm") ||
+            isTracked("fc_repos_bpm") ||
+            isTracked("nb_pas")) && (
           <section className="form-section">
+            {isTracked("poids_kg") && (
             <label className={`field ${fieldClass("poids_kg")}`}>
               <FieldLabelWithOverride
                 label="Poids (kg)"
@@ -343,8 +351,11 @@ export function TodayPage() {
                 onChange={(e) => setNum("poids_kg", e.target.value)}
               />
             </label>
+            )}
 
+            {(isTracked("masse_grasse_pct") || isTracked("tour_taille_cm") || isTracked("fc_repos_bpm")) && (
             <div className="form-row form-row--3">
+              {isTracked("masse_grasse_pct") && (
               <label className={`field ${fieldClass("masse_grasse_pct")}`}>
                 <FieldLabelWithOverride
                   label="% masse grasse"
@@ -361,6 +372,8 @@ export function TodayPage() {
                   onChange={(e) => setNum("masse_grasse_pct", e.target.value)}
                 />
               </label>
+              )}
+              {isTracked("tour_taille_cm") && (
               <label className="field">
                 <span className="field-label-row">Tour de taille (cm)</span>
                 <input
@@ -371,6 +384,8 @@ export function TodayPage() {
                   onChange={(e) => setNum("tour_taille_cm", e.target.value)}
                 />
               </label>
+              )}
+              {isTracked("fc_repos_bpm") && (
               <label className={`field ${fieldClass("fc_repos_bpm")}`}>
                 <FieldLabelWithOverride
                   label="FC repos (bpm)"
@@ -386,8 +401,11 @@ export function TodayPage() {
                   onChange={(e) => setNum("fc_repos_bpm", e.target.value)}
                 />
               </label>
+              )}
             </div>
+            )}
 
+            {isTracked("nb_pas") && (
             <label className={`field ${fieldClass("nb_pas")}`}>
               <FieldLabelWithOverride
                 label="Nombre de pas"
@@ -407,10 +425,14 @@ export function TodayPage() {
                 onChange={(e) => setNum("nb_pas", e.target.value)}
               />
             </label>
+            )}
           </section>
+          )}
 
+          {isTensionTracked() && (
           <section className="form-section">
             <div className="form-row form-row--2">
+              {isTracked("tension_sys_mmhg") && (
               <label className={`field ${fieldClass("tension_sys_mmhg")}`}>
                 <FieldLabelWithOverride
                   label="Tension SYS (mmHg)"
@@ -426,6 +448,8 @@ export function TodayPage() {
                   onChange={(e) => setNum("tension_sys_mmhg", e.target.value)}
                 />
               </label>
+              )}
+              {isTracked("tension_dia_mmhg") && (
               <label className={`field ${fieldClass("tension_dia_mmhg")}`}>
                 <FieldLabelWithOverride
                   label="Tension DIA (mmHg)"
@@ -441,10 +465,14 @@ export function TodayPage() {
                   onChange={(e) => setNum("tension_dia_mmhg", e.target.value)}
                 />
               </label>
+              )}
             </div>
           </section>
+          )}
 
+          {hasWellbeing() && (
           <section className="form-section form-section--wellbeing">
+            {isTracked("sommeil") && (
             <SleepScaleInput
               label="Qualité du sommeil"
               value={form.sommeil}
@@ -455,6 +483,8 @@ export function TodayPage() {
               resumeDisabled={saving}
               onChange={(v) => setForm((f) => ({ ...f, sommeil: v }))}
             />
+            )}
+            {isTracked("stress") && (
             <TextScaleInput
               label="Niveau de stress"
               showOverride={showsOverrideUi("stress")}
@@ -470,6 +500,8 @@ export function TodayPage() {
               value={form.stress}
               onChange={(v) => setForm((f) => ({ ...f, stress: v }))}
             />
+            )}
+            {isTracked("energie") && (
             <TextScaleInput
               label="Niveau d'énergie"
               showOverride={showsOverrideUi("energie")}
@@ -485,6 +517,8 @@ export function TodayPage() {
               value={form.energie}
               onChange={(v) => setForm((f) => ({ ...f, energie: v }))}
             />
+            )}
+            {isTracked("faim") && (
             <TextScaleInput
               label="Niveau de faim"
               options={[
@@ -495,10 +529,15 @@ export function TodayPage() {
               value={form.faim}
               onChange={(v) => setForm((f) => ({ ...f, faim: v }))}
             />
+            )}
           </section>
+          )}
 
+          {hasHabits() && (
           <section className="form-section">
+            {(isTracked("entrainement") || isTracked("alcool") || isTracked("cheat_meal")) && (
             <div className="checkbox-row">
+              {isTracked("entrainement") && (
               <label>
                 <input
                   type="checkbox"
@@ -507,6 +546,8 @@ export function TodayPage() {
                 />
                 Entraînement
               </label>
+              )}
+              {isTracked("alcool") && (
               <label>
                 <input
                   type="checkbox"
@@ -515,6 +556,8 @@ export function TodayPage() {
                 />
                 Alcool
               </label>
+              )}
+              {isTracked("cheat_meal") && (
               <label>
                 <input
                   type="checkbox"
@@ -523,8 +566,11 @@ export function TodayPage() {
                 />
                 Repas plaisir
               </label>
+              )}
             </div>
+            )}
 
+            {isTracked("notes") && (
             <label className="field">
               <span className="field-label-row">Notes</span>
               <textarea
@@ -535,7 +581,9 @@ export function TodayPage() {
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))}
               />
             </label>
+            )}
           </section>
+          )}
         </div>
       </div>
     </>

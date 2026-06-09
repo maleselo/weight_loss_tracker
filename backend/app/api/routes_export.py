@@ -11,6 +11,7 @@ from app.models.daily_measurement import DailyMeasurement
 from app.models.user import User
 from app.services.csv_export import build_measurements_csv
 from app.services.pdf_report import build_health_report_pdf
+from app.services.tracked_fields import effective_tracked_fields
 
 router = APIRouter()
 
@@ -53,6 +54,7 @@ def export_pdf(
     if not measurements:
         raise HTTPException(status_code=404, detail="Aucune mesure sur cette période.")
 
+    tracked = effective_tracked_fields(current_user)
     pdf_bytes = build_health_report_pdf(
         user=current_user,
         measurements=measurements,
@@ -61,6 +63,7 @@ def export_pdf(
         include_chart=include_chart,
         include_table=include_table,
         include_context=include_context,
+        tracked_fields=tracked,
     )
     filename = f"rapport-sante_{start.isoformat()}_{end.isoformat()}.pdf"
     return Response(
@@ -91,7 +94,8 @@ def export_csv(
     if not measurements:
         raise HTTPException(status_code=404, detail="Aucune mesure à exporter.")
 
-    csv_bytes = build_measurements_csv(measurements)
+    tracked = effective_tracked_fields(current_user)
+    csv_bytes = build_measurements_csv(measurements, tracked_fields=tracked)
     suffix = ""
     if start and end:
         suffix = f"_{start.isoformat()}_{end.isoformat()}"

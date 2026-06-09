@@ -17,6 +17,7 @@ from app.schemas.auth import (
 )
 from app.services.password_reset import FORGOT_PASSWORD_MESSAGE, request_password_reset, reset_password
 from app.schemas.user import UserCreate, UserOut, UserUpdate
+from app.services.tracked_fields import normalize_tracked_fields
 
 router = APIRouter()
 
@@ -76,6 +77,8 @@ def update_me(
     db: Session = Depends(get_db),
 ):
     data = payload.model_dump(exclude_unset=True)
+    if "tracked_fields" in data:
+        current_user.tracked_fields = normalize_tracked_fields(data.pop("tracked_fields"))
     for key, value in data.items():
         setattr(current_user, key, value)
     db.commit()

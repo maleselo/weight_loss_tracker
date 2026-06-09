@@ -14,6 +14,8 @@ class UserOut(BaseModel):
     taille_cm: float | None
     poids_cible_kg: float | None
     timezone: str
+    tracked_fields: list[str] = Field(default_factory=list)
+    catalog_version_seen: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -21,3 +23,5 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     taille_cm: float | None = Field(default=None, ge=120, le=230)
     poids_cible_kg: float | None = Field(default=None, ge=20, le=300)
+    tracked_fields: list[str] | None = None
+    catalog_version_seen: int | None = Field(default=None, ge=0)

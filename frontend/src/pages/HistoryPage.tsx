@@ -2,17 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useTrackedFields } from "../hooks/useTrackedFields";
+import type { MeasureFieldName } from "../lib/measureFields";
 import { daysAgoISO, formatDateFR } from "../lib/dates";
 import type { DailyMeasurement } from "../types";
 
-function formatSummary(m: DailyMeasurement): string {
+function formatSummary(m: DailyMeasurement, isTracked: (f: MeasureFieldName) => boolean): string {
   return (
     [
-      m.poids_kg != null && `${m.poids_kg} kg`,
-      m.masse_grasse_pct != null && `${m.masse_grasse_pct} % MG`,
-      m.nb_pas != null && `${m.nb_pas.toLocaleString("fr-FR")} pas`,
-      m.fc_repos_bpm != null && `${m.fc_repos_bpm} bpm repos`,
-      m.tension_sys_mmhg != null && `${m.tension_sys_mmhg}/${m.tension_dia_mmhg} mmHg`,
+      isTracked("poids_kg") && m.poids_kg != null && `${m.poids_kg} kg`,
+      isTracked("masse_grasse_pct") && m.masse_grasse_pct != null && `${m.masse_grasse_pct} % MG`,
+      isTracked("nb_pas") && m.nb_pas != null && `${m.nb_pas.toLocaleString("fr-FR")} pas`,
+      isTracked("fc_repos_bpm") && m.fc_repos_bpm != null && `${m.fc_repos_bpm} bpm repos`,
+      (isTracked("tension_sys_mmhg") || isTracked("tension_dia_mmhg")) &&
+        m.tension_sys_mmhg != null &&
+        `${m.tension_sys_mmhg}/${m.tension_dia_mmhg} mmHg`,
     ]
       .filter(Boolean)
       .join(" · ") || "—"
@@ -21,6 +25,7 @@ function formatSummary(m: DailyMeasurement): string {
 
 export function HistoryPage() {
   const { token } = useAuth();
+  const { isTracked } = useTrackedFields();
   const [items, setItems] = useState<DailyMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
@@ -87,7 +92,7 @@ export function HistoryPage() {
             <Link to={`/?date=${m.date}`} className="history-item">
               <div>
                 <strong>{formatDateFR(m.date)}</strong>
-                <div className="history-item__summary">{formatSummary(m)}</div>
+                <div className="history-item__summary">{formatSummary(m, isTracked)}</div>
               </div>
               <span className="history-item__chevron" aria-hidden>
                 ›

@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, Numeric, String
+from sqlalchemy import Integer, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -13,6 +13,8 @@ class User(Base):
     taille_cm: Mapped[float | None] = mapped_column(Numeric(5, 1), nullable=True)
     poids_cible_kg: Mapped[float | None] = mapped_column(Numeric(5, 1), nullable=True)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Europe/Paris")
+    tracked_fields: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    catalog_version_seen: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     measurements = relationship("DailyMeasurement", back_populates="user")
     health_connections = relationship("HealthConnection", back_populates="user")

@@ -4,6 +4,7 @@ import { AndroidAppInstall } from "../components/AndroidAppInstall";
 import { WeightChart } from "../components/WeightChart";
 import { WeightGoalGauge } from "../components/WeightGoalGauge";
 import { useAuth } from "../context/AuthContext";
+import { useTrackedFields } from "../hooks/useTrackedFields";
 import { daysAgoISO, formatDelta } from "../lib/dates";
 import { deltaWeightClass, isTensionAlert } from "../lib/metrics";
 import type { DashboardSummary, SeriesOut } from "../types";
@@ -19,6 +20,7 @@ const RANGE_OPTIONS: { key: ChartRange; label: string }[] = [
 
 export function DashboardPage() {
   const { token, user, updateProfile } = useAuth();
+  const { isTracked, isTensionTracked } = useTrackedFields();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [series, setSeries] = useState<SeriesOut | null>(null);
   const [allTimeSeries, setAllTimeSeries] = useState<SeriesOut | null>(null);
@@ -111,6 +113,7 @@ export function DashboardPage() {
     <>
       <AndroidAppInstall />
 
+      {isTracked("poids_kg") && (
       <div className="card">
         <h2>Poids</h2>
         <div className="stats-grid">
@@ -198,7 +201,9 @@ export function DashboardPage() {
           </button>
         </form>
       </div>
+      )}
 
+      {isTracked("poids_kg") && (
       <div className="card">
         <div className="card-header-row">
           <h2>{chartTitle}</h2>
@@ -217,14 +222,15 @@ export function DashboardPage() {
         </div>
         {series && <WeightChart points={series.points} poidsCible={poidsCible} />}
       </div>
+      )}
 
-      {(summary.masse_grasse_pct.valeur_actuelle != null ||
-        summary.tension_sys_mmhg.valeur_actuelle != null ||
-        summary.nb_pas.valeur_actuelle != null) && (
+      {((isTracked("masse_grasse_pct") && summary.masse_grasse_pct.valeur_actuelle != null) ||
+        (isTensionTracked() && summary.tension_sys_mmhg.valeur_actuelle != null) ||
+        (isTracked("nb_pas") && summary.nb_pas.valeur_actuelle != null)) && (
         <div className="card">
           <h2>Autres indicateurs</h2>
           <div className="stats-grid">
-            {summary.masse_grasse_pct.valeur_actuelle != null && (
+            {isTracked("masse_grasse_pct") && summary.masse_grasse_pct.valeur_actuelle != null && (
               <div className="stat-box">
                 <div className="label">% MG</div>
                 <div className="value">{summary.masse_grasse_pct.valeur_actuelle}%</div>
@@ -233,7 +239,7 @@ export function DashboardPage() {
                 </div>
               </div>
             )}
-            {summary.tension_sys_mmhg.valeur_actuelle != null && (
+            {isTensionTracked() && summary.tension_sys_mmhg.valeur_actuelle != null && (
               <div className={`stat-box ${tensionAlert ? "stat-box--alert" : ""}`}>
                 <div className="label">
                   Tension
@@ -250,7 +256,7 @@ export function DashboardPage() {
                 <div className="sub">mmHg (dernière mesure)</div>
               </div>
             )}
-            {summary.nb_pas.valeur_actuelle != null && (
+            {isTracked("nb_pas") && summary.nb_pas.valeur_actuelle != null && (
               <div className="stat-box">
                 <div className="label">Pas</div>
                 <div className="value">

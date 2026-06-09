@@ -4,11 +4,15 @@ export interface User {
   taille_cm: number | null;
   poids_cible_kg: number | null;
   timezone: string;
+  tracked_fields: string[];
+  catalog_version_seen: number;
 }
 
 export interface UserUpdate {
   taille_cm?: number | null;
   poids_cible_kg?: number | null;
+  tracked_fields?: string[];
+  catalog_version_seen?: number;
 }
 
 export interface DailyMeasurement {

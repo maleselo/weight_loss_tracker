@@ -4,23 +4,22 @@ from typing import Sequence
 
 from app.models.daily_measurement import DailyMeasurement
 
-HEADERS = [
-    "Date",
-    "Poids (kg)",
-    "Masse grasse (%)",
-    "Tour de taille (cm)",
-    "Tension SYS (mmHg)",
-    "Tension DIA (mmHg)",
-    "FC repos (bpm)",
-    "Nombre de pas",
-    "Sommeil (1-3)",
-    "Stress (1-3)",
-    "Énergie (1-3)",
-    "Faim (1-3)",
-    "Entraînement",
-    "Alcool",
-    "Repas plaisir",
-    "Notes",
+COLUMN_DEFS: list[tuple[str, str, str]] = [
+    ("poids_kg", "Poids (kg)", "poids_kg"),
+    ("masse_grasse_pct", "Masse grasse (%)", "masse_grasse_pct"),
+    ("tour_taille_cm", "Tour de taille (cm)", "tour_taille_cm"),
+    ("tension_sys_mmhg", "Tension SYS (mmHg)", "tension_sys_mmhg"),
+    ("tension_dia_mmhg", "Tension DIA (mmHg)", "tension_dia_mmhg"),
+    ("fc_repos_bpm", "FC repos (bpm)", "fc_repos_bpm"),
+    ("nb_pas", "Nombre de pas", "nb_pas"),
+    ("sommeil", "Sommeil (1-3)", "sommeil"),
+    ("stress", "Stress (1-3)", "stress"),
+    ("energie", "Énergie (1-3)", "energie"),
+    ("faim", "Faim (1-3)", "faim"),
+    ("entrainement", "Entraînement", "entrainement"),
+    ("alcool", "Alcool", "alcool"),
+    ("cheat_meal", "Repas plaisir", "cheat_meal"),
+    ("notes", "Notes", "notes"),
 ]
 
 
@@ -34,29 +33,22 @@ def _cell(value) -> str:
     return str(value)
 
 
-def build_measurements_csv(measurements: Sequence[DailyMeasurement]) -> bytes:
+def build_measurements_csv(
+    measurements: Sequence[DailyMeasurement],
+    tracked_fields: Sequence[str] | None = None,
+) -> bytes:
+    active = {f for f in (tracked_fields or [])}
+    cols = [c for c in COLUMN_DEFS if not active or c[0] in active]
+
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";", lineterminator="\n")
-    writer.writerow(HEADERS)
+    writer.writerow(["Date"] + [c[1] for c in cols])
     for m in sorted(measurements, key=lambda x: x.date):
-        writer.writerow(
-            [
-                m.date.strftime("%d/%m/%Y"),
-                _cell(m.poids_kg),
-                _cell(m.masse_grasse_pct),
-                _cell(m.tour_taille_cm),
-                _cell(m.tension_sys_mmhg),
-                _cell(m.tension_dia_mmhg),
-                _cell(m.fc_repos_bpm),
-                _cell(m.nb_pas),
-                _cell(m.sommeil),
-                _cell(m.stress),
-                _cell(m.energie),
-                _cell(m.faim),
-                _cell(m.entrainement),
-                _cell(m.alcool),
-                _cell(m.cheat_meal),
-                (m.notes or "").replace("\n", " ").strip(),
-            ]
-        )
+        row = [m.date.strftime("%d/%m/%Y")]
+        for _, _, attr in cols:
+            if attr == "notes":
+                row.append((m.notes or "").replace("\n", " ").strip())
+            else:
+                row.append(_cell(getattr(m, attr)))
+        writer.writerow(row)
     return buf.getvalue().encode("utf-8-sig")

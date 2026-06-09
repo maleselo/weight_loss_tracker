@@ -9,6 +9,7 @@ import type {
   User,
   UserUpdate,
 } from "../types";
+import { saveExportedFile } from "../lib/saveExportedFile";
 
 /** Fallback APK si le build CI n’embarque pas VITE_API_URL (production Railway). */
 const DEFAULT_NATIVE_API_URL = "https://api-production-63ae.up.railway.app";
@@ -169,7 +170,7 @@ export const api = {
       includeTable?: boolean;
       includeContext?: boolean;
     } = {},
-  ) => {
+  ): Promise<"downloaded" | "shared"> => {
     const params = new URLSearchParams({ start, end });
     params.set("include_chart", String(options.includeChart ?? true));
     params.set("include_table", String(options.includeTable ?? true));
@@ -188,17 +189,10 @@ export const api = {
       throw new ApiError(res.status, String(detail));
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rapport-sante_${start}_${end}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    return saveExportedFile(blob, `rapport-sante_${start}_${end}.pdf`);
   },
 
-  downloadCsv: async (token: string, start: string, end: string) => {
+  downloadCsv: async (token: string, start: string, end: string): Promise<"downloaded" | "shared"> => {
     const params = new URLSearchParams({ start, end });
     const res = await fetch(apiUrl(`/api/export/csv?${params}`), {
       headers: { Authorization: `Bearer ${token}` },
@@ -214,14 +208,7 @@ export const api = {
       throw new ApiError(res.status, String(detail));
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mesures-sante_${start}_${end}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    return saveExportedFile(blob, `mesures-sante_${start}_${end}.csv`);
   },
 
   integrationStatus: (token: string) =>

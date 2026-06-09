@@ -32,12 +32,16 @@ export function ExportPage() {
     setError(null);
     setMessage(null);
     try {
-      await api.downloadPdf(token, start, end, {
+      const result = await api.downloadPdf(token, start, end, {
         includeChart,
         includeTable,
         includeContext,
       });
-      setMessage("PDF téléchargé.");
+      setMessage(
+        result === "shared"
+          ? "PDF prêt — choisissez une application pour l'enregistrer ou le partager."
+          : "PDF téléchargé.",
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Export impossible.");
     } finally {
@@ -55,8 +59,12 @@ export function ExportPage() {
     setError(null);
     setMessage(null);
     try {
-      await api.downloadCsv(token, start, end);
-      setMessage("CSV téléchargé.");
+      const result = await api.downloadCsv(token, start, end);
+      setMessage(
+        result === "shared"
+          ? "CSV prêt — choisissez une application pour l'enregistrer ou le partager."
+          : "CSV téléchargé.",
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Export CSV impossible.");
     } finally {

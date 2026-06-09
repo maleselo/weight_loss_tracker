@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { FieldLabelWithOverride } from "../components/FieldLabelWithOverride";
@@ -52,6 +52,8 @@ function measureToPayload(m: MeasureFormValues, manualOverrides: string[]) {
 }
 
 const SYNC_RESTORE_FLASH_MS = 2500;
+const AUTO_SAVE_DEBOUNCE_MS = 600;
+const SAVED_HINT_MS = 2000;
 
 export function TodayPage() {
   const { token } = useAuth();
@@ -68,23 +70,26 @@ export function TodayPage() {
   const [healthPermissions, setHealthPermissions] = useState<ReadonlySet<string>>(new Set());
   const [syncRestoredFields, setSyncRestoredFields] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [formReady, setFormReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savedHint, setSavedHint] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  function setEntryDate(newDate: string) {
-    if (!newDate) return;
-    if (newDate > today) return;
-    if (newDate === today) {
-      navigate("/", { replace: true });
-    } else {
-      navigate(`/?date=${newDate}`, { replace: true });
-    }
-  }
+  const formRef = useRef(form);
+  const baselineRef = useRef(baselineForm);
+  const manualOverridesRef = useRef(manualOverrides);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  formRef.current = form;
+  baselineRef.current = baselineForm;
+  manualOverridesRef.current = manualOverrides;
 
   const loadDay = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (!token) return;
+      setFormReady(false);
       if (!opts?.silent) {
         setLoading(true);
         setMessage(null);
@@ -128,6 +133,7 @@ export function TodayPage() {
         }
       } finally {
         if (!opts?.silent) setLoading(false);
+        setFormReady(true);
       }
     },
     [token, date],
@@ -137,10 +143,86 @@ export function TodayPage() {
     loadDay();
   }, [loadDay]);
 
+  const canSyncField = useCallback(
+    (field: MeasureFieldName) => {
+      return (
+        healthSyncActive &&
+        isHealthSyncField(field) &&
+        fieldHasHealthPermission(field, healthPermissions)
+      );
+    },
+    [healthSyncActive, healthPermissions],
+  );
+
+  const persistForm = useCallback(async () => {
+    if (!token) return;
+
+    const currentForm = formRef.current;
+    const currentBaseline = baselineRef.current;
+    const dirty = detectDirtyMeasureFields(currentBaseline, currentForm).filter((f) => canSyncField(f));
+    const allDirty = detectDirtyMeasureFields(currentBaseline, currentForm);
+    if (allDirty.length === 0) return;
+
+    setSaving(true);
+    setError(null);
+    setSavedHint(false);
+    try {
+      const overrides = healthSyncActive
+        ? mergeManualOverrides(manualOverridesRef.current, dirty)
+        : manualOverridesRef.current;
+      const saved = await api.upsertMeasure(token, date, measureToPayload(currentForm, overrides));
+      const { id: _, date: __, manual_overrides, ...rest } = saved;
+      setForm(rest);
+      setBaselineForm(rest);
+      setManualOverrides(manual_overrides ?? []);
+      setSavedHint(true);
+      if (savedHintTimerRef.current) clearTimeout(savedHintTimerRef.current);
+      savedHintTimerRef.current = setTimeout(() => setSavedHint(false), SAVED_HINT_MS);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
+  }, [token, date, healthSyncActive, canSyncField]);
+
+  const flushSave = useCallback(async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const dirty = detectDirtyMeasureFields(baselineRef.current, formRef.current);
+    if (dirty.length > 0) {
+      await persistForm();
+    }
+  }, [persistForm]);
+
+  useEffect(() => {
+    if (!formReady || !token) return;
+    if (detectDirtyMeasureFields(baselineForm, form).length === 0) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      void persistForm();
+    }, AUTO_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [form, formReady, token, baselineForm, persistForm]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (savedHintTimerRef.current) clearTimeout(savedHintTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (!token || !isToday) return;
 
     function onTodaySynced() {
+      if (detectDirtyMeasureFields(baselineRef.current, formRef.current).length > 0) return;
       loadDay({ silent: true });
     }
 
@@ -148,13 +230,19 @@ export function TodayPage() {
     return () => window.removeEventListener(HEALTH_TODAY_SYNCED_EVENT, onTodaySynced);
   }, [token, isToday, loadDay]);
 
+  async function setEntryDate(newDate: string) {
+    if (!newDate || newDate > today) return;
+    await flushSave();
+    if (newDate === today) {
+      navigate("/", { replace: true });
+    } else {
+      navigate(`/?date=${newDate}`, { replace: true });
+    }
+  }
+
   function setNum<K extends keyof MeasureFormValues>(key: K, raw: string) {
     const v = raw === "" ? null : Number(raw);
     setForm((f) => ({ ...f, [key]: Number.isFinite(v) ? v : null }));
-  }
-
-  function canSyncField(field: MeasureFieldName) {
-    return healthSyncActive && isHealthSyncField(field) && fieldHasHealthPermission(field, healthPermissions);
   }
 
   function showsOverrideUi(field: MeasureFieldName) {
@@ -181,6 +269,7 @@ export function TodayPage() {
   async function unlockFields(fields: MeasureFieldName[]) {
     const syncFields = fields.filter((f) => canSyncField(f));
     if (!token || !healthSyncActive || syncFields.length === 0) return;
+    await flushSave();
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -201,36 +290,6 @@ export function TodayPage() {
     }
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!token) return;
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const dirty = detectDirtyMeasureFields(baselineForm, form).filter((f) => canSyncField(f));
-      const overrides = healthSyncActive
-        ? mergeManualOverrides(manualOverrides, dirty)
-        : manualOverrides;
-      const saved = await api.upsertMeasure(token, date, measureToPayload(form, overrides));
-      const { id: _, date: __, manual_overrides, ...rest } = saved;
-      setForm(rest);
-      setBaselineForm(rest);
-      setManualOverrides(manual_overrides ?? []);
-      if (dirty.length > 0) {
-        setMessage(
-          `Mesure enregistrée pour le ${formatDateFR(date)}. ${formatFieldList(dirty)} en saisie manuelle (non écrasé par Health Connect).`,
-        );
-      } else {
-        setMessage(`Mesure enregistrée pour le ${formatDateFR(date)}.`);
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Enregistrement impossible.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) return <p className="empty">Chargement…</p>;
 
   const resume = (field: MeasureFieldName) => () => unlockFields([field]);
@@ -238,12 +297,16 @@ export function TodayPage() {
   return (
     <>
       <div className="card">
-        <h2>{isToday ? "Aujourd'hui" : formatDateFR(date)}</h2>
-        <p className="card-intro">Saisie rapide — les champs sont optionnels.</p>
+        <div className="today-header-row">
+          <h2>{isToday ? "Aujourd'hui" : formatDateFR(date)}</h2>
+          {saving && <span className="autosave-hint">Enregistrement…</span>}
+          {!saving && savedHint && <span className="autosave-hint autosave-hint--ok">Enregistré</span>}
+        </div>
+        <p className="card-intro">Saisie rapide — enregistrement automatique.</p>
         {message && <div className="alert alert-success">{message}</div>}
         {error && <div className="alert alert-error">{error}</div>}
 
-        <form className="form-grid form-grid--daily" onSubmit={onSubmit}>
+        <div className="form-grid form-grid--daily">
           <section className="form-section">
             <label className="field">
               <span className="field-label-row">Date de la mesure</span>
@@ -251,12 +314,12 @@ export function TodayPage() {
                 type="date"
                 value={date}
                 max={today}
-                onChange={(e) => setEntryDate(e.target.value)}
+                onChange={(e) => void setEntryDate(e.target.value)}
                 required
               />
             </label>
             {!isToday && (
-              <button type="button" className="btn btn-ghost" onClick={() => setEntryDate(today)}>
+              <button type="button" className="btn btn-ghost" onClick={() => void setEntryDate(today)}>
                 Revenir à aujourd&apos;hui
               </button>
             )}
@@ -473,13 +536,7 @@ export function TodayPage() {
               />
             </label>
           </section>
-
-          <div className="form-actions-row">
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Enregistrement…" : "Enregistrer"}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </>
   );

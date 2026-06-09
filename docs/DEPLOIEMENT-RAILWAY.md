@@ -107,9 +107,9 @@ Noter l’URL : **`https://<api>.up.railway.app`** (sans slash final).
 
 | Variable | Valeur |
 |----------|--------|
-| `VITE_API_URL` | `https://<api>.up.railway.app` (URL de l’étape 3.4) |
+| `VITE_API_URL` | `https://api-production-63ae.up.railway.app` (URL du service **api**, sans slash final) |
 
-Sans cette variable, le build ne pointe pas vers la bonne API.
+Sans cette variable, le web utilise le fallback au démarrage (`railway-start.sh`) ; l’APK embarque l’URL au build (CI ou `VITE_API_URL=… npm run build:capacitor`).
 
 ### 4.4 Domaine public
 

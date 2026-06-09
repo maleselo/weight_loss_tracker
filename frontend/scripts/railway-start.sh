@@ -3,7 +3,7 @@ set -e
 
 cd /app
 
-API_URL="${VITE_API_URL:-}"
+API_URL="${VITE_API_URL:-https://api-production-63ae.up.railway.app}"
 API_URL="${API_URL%/}"
 
 # Runtime config: Vite env vars are build-time only; inject at container start.

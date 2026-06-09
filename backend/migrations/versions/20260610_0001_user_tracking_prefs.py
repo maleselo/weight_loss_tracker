@@ -4,8 +4,6 @@ Revision ID: 20260610_0001
 Revises: 20260606_0001
 """
 
-import json
-
 import sqlalchemy as sa
 from alembic import op
 
@@ -54,9 +52,10 @@ def upgrade() -> None:
             server_default="0",
         ),
     )
+    # bindparam sans type JSON est casté en VARCHAR par psycopg → erreur sur colonne JSON
     op.execute(
         sa.text("UPDATE users SET tracked_fields = :fields, catalog_version_seen = 1").bindparams(
-            fields=json.dumps(ALL_FIELDS),
+            sa.bindparam("fields", ALL_FIELDS, type_=sa.JSON()),
         )
     )
 

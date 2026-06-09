@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import type {
   DailyMeasurement,
   DashboardSummary,
@@ -9,6 +10,9 @@ import type {
   UserUpdate,
 } from "../types";
 
+/** Fallback APK si le build CI n’embarque pas VITE_API_URL (production Railway). */
+const DEFAULT_NATIVE_API_URL = "https://api-production-63ae.up.railway.app";
+
 function getApiBase(): string {
   const runtime = window.__API_URL__?.trim().replace(/\/$/, "");
   if (runtime) return runtime;
@@ -16,6 +20,7 @@ function getApiBase(): string {
   if (fromEnv) return fromEnv;
   // Dev local : base vide → URLs relatives proxifiées par Vite vers :8000
   if (import.meta.env.DEV) return "";
+  if (Capacitor.isNativePlatform()) return DEFAULT_NATIVE_API_URL;
   return "";
 }
 

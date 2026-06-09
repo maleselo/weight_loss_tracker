@@ -40,7 +40,7 @@ const HEALTH_READ_TYPES = [
   "sleep",
   "heartRateVariability",
 ] as const;
-type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
+export type HealthReadType = (typeof HEALTH_READ_TYPES)[number];
 
 const PERMISSION_LABELS: Record<string, string> = {
   steps: "pas",
@@ -204,6 +204,22 @@ async function queryDailyAggregatedSafe(
     }
     throw err;
   }
+}
+
+/** Autorisations Health Connect accordées (sans ouvrir la fenêtre de permission). */
+export async function getHealthConnectAuthorizedTypes(): Promise<Set<HealthReadType>> {
+  if (!isNativeHealthAvailable()) {
+    return new Set();
+  }
+
+  const { Health } = await import("@capgo/capacitor-health");
+  const availability = await Health.isAvailable();
+  if (!availability.available) {
+    return new Set();
+  }
+
+  const auth = await Health.checkAuthorization({ read: [...HEALTH_READ_TYPES] });
+  return new Set((auth.readAuthorized ?? []) as HealthReadType[]);
 }
 
 /** Lit Health Connect (Android) — hub unique après config des apps sources. */

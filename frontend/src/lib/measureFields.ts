@@ -2,6 +2,45 @@ import type { DailyMeasurement } from "../types";
 
 export type MeasureFieldName = keyof Omit<DailyMeasurement, "id" | "date" | "manual_overrides">;
 
+/** Champs réellement mis à jour par la synchronisation Health Connect. */
+export const HEALTH_SYNC_FIELD_NAMES: MeasureFieldName[] = [
+  "poids_kg",
+  "masse_grasse_pct",
+  "fc_repos_bpm",
+  "nb_pas",
+  "tension_sys_mmhg",
+  "tension_dia_mmhg",
+  "sommeil",
+  "stress",
+  "energie",
+];
+
+export function isHealthSyncField(field: MeasureFieldName): boolean {
+  return HEALTH_SYNC_FIELD_NAMES.includes(field);
+}
+
+/** Types Health Connect requis pour synchroniser chaque champ (au moins un accordé). */
+export const FIELD_HEALTH_PERMISSIONS: Partial<Record<MeasureFieldName, readonly string[]>> = {
+  poids_kg: ["weight"],
+  masse_grasse_pct: ["bodyFat"],
+  fc_repos_bpm: ["restingHeartRate", "heartRate"],
+  nb_pas: ["steps"],
+  tension_sys_mmhg: ["bloodPressure"],
+  tension_dia_mmhg: ["bloodPressure"],
+  sommeil: ["sleep"],
+  stress: ["heartRateVariability", "restingHeartRate", "heartRate"],
+  energie: ["sleep"],
+};
+
+export function fieldHasHealthPermission(
+  field: MeasureFieldName,
+  authorized: ReadonlySet<string>,
+): boolean {
+  const required = FIELD_HEALTH_PERMISSIONS[field];
+  if (!required?.length) return false;
+  return required.some((permission) => authorized.has(permission));
+}
+
 export const MEASURE_FIELD_NAMES: MeasureFieldName[] = [
   "poids_kg",
   "masse_grasse_pct",

@@ -81,15 +81,11 @@ export function OnboardingPage() {
         <div className="card">
           <h2>Affinez votre suivi</h2>
           <p className="card-intro">
-            Désactivez les indicateurs que vous ne souhaitez pas voir. Les champs sensibles sont signalés — vous
-            pouvez les masquer sans perdre vos données.
+            Désactivez les indicateurs que vous ne souhaitez pas voir. Vous pourrez les réactiver plus tard dans
+            les paramètres.
           </p>
           {error && <div className="alert alert-error">{error}</div>}
-          <TrackingFieldToggles
-            selected={selected}
-            onChange={setSelected}
-            highlightSensitive
-          />
+          <TrackingFieldToggles selected={selected} onChange={setSelected} />
           <div className="form-actions onboarding-actions">
             <button type="button" className="btn btn-ghost" onClick={() => setStep("preset")}>
               Retour

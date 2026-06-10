@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppVersion } from "./AppVersion";
 import { WhatsNewModal } from "./WhatsNewModal";
 import { useAuth } from "../context/AuthContext";
@@ -10,6 +10,8 @@ import { useTodayHealthSyncOnOpen } from "../hooks/useTodayHealthSyncOnOpen";
 export function Layout() {
   const { user, logout, token, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const settingsOpen = location.pathname === "/parametres";
   const [whatsNewDismissed, setWhatsNewDismissed] = useState(false);
   const pendingNewToggles = whatsNewToggles(user);
   const showWhatsNew = needsWhatsNew(user) && !whatsNewDismissed && pendingNewToggles.length > 0;
@@ -27,9 +29,16 @@ export function Layout() {
         <div className="app-header__title-row">
           <h1>Tableau de bord santé</h1>
           <div className="app-header__actions">
-            <Link to="/parametres" className="btn-icon btn-icon--header" aria-label="Paramètres" title="Paramètres">
+            <button
+              type="button"
+              className={`btn-icon btn-icon--header${settingsOpen ? " btn-icon--header-active" : ""}`}
+              aria-label={settingsOpen ? "Fermer les paramètres" : "Paramètres"}
+              aria-pressed={settingsOpen}
+              title={settingsOpen ? "Fermer les paramètres" : "Paramètres"}
+              onClick={() => navigate(settingsOpen ? "/" : "/parametres")}
+            >
               ⚙
-            </Link>
+            </button>
             <AppVersion />
           </div>
         </div>

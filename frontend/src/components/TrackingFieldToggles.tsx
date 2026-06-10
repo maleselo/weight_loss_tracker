@@ -6,14 +6,12 @@ import {
 interface TrackingFieldTogglesProps {
   selected: ReadonlySet<string>;
   onChange: (next: Set<string>) => void;
-  highlightSensitive?: boolean;
   highlightNew?: ReadonlySet<string>;
 }
 
 export function TrackingFieldToggles({
   selected,
   onChange,
-  highlightSensitive = false,
   highlightNew,
 }: TrackingFieldTogglesProps) {
   function toggle(t: CatalogToggle) {
@@ -31,11 +29,7 @@ export function TrackingFieldToggles({
           <ul className="tracking-toggle-list">
             {cat.toggles.map((t) => {
               const isNew = highlightNew?.has(t.id);
-              const classes = [
-                "tracking-toggle",
-                t.sensitive && highlightSensitive ? "tracking-toggle--sensitive" : "",
-                isNew ? "tracking-toggle--new" : "",
-              ]
+              const classes = ["tracking-toggle", isNew ? "tracking-toggle--new" : ""]
                 .filter(Boolean)
                 .join(" ");
               return (
@@ -51,10 +45,9 @@ export function TrackingFieldToggles({
                       {t.description && (
                         <span className="tracking-toggle__desc">{t.description}</span>
                       )}
-                      {t.sensitive && highlightSensitive && (
-                        <span className="tracking-toggle__badge">Sensible</span>
+                      {isNew && (
+                        <span className="tracking-toggle__badge tracking-toggle__badge--new">Nouveau</span>
                       )}
-                      {isNew && <span className="tracking-toggle__badge tracking-toggle__badge--new">Nouveau</span>}
                     </span>
                   </label>
                 </li>

@@ -55,7 +55,7 @@ export function SettingsPage() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <form onSubmit={onSubmit}>
-        <TrackingFieldToggles selected={selected} onChange={setSelected} highlightSensitive />
+        <TrackingFieldToggles selected={selected} onChange={setSelected} />
         <div className="form-actions">
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Enregistrement…" : "Enregistrer"}

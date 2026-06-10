@@ -1259,6 +1259,12 @@ label.field textarea:focus {
   color: var(--teal-800);
 }
 
+.btn-icon--header-active {
+  color: var(--teal-800);
+  background: var(--teal-50);
+  border-radius: 8px;
+}
+
 .onboarding-page {
   min-height: 100dvh;
   padding: 1.25rem 1.25rem 2rem;
@@ -1375,10 +1381,6 @@ label.field textarea:focus {
   background: var(--slate-100);
   color: var(--slate-600);
   width: fit-content;
-}
-
-.tracking-toggle--sensitive {
-  border-left: 3px solid #f59e0b;
 }
 
 .tracking-toggle__badge--new {
